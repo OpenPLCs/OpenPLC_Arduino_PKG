@@ -47,6 +47,10 @@ compiler.define=-DARDUINO=
 build.st_extra_flags=
 build.extra_flags=
 build.bootloader_flags=
+# Overridden per selection by the "Downgrade policy" menu; empty keeps the upload
+# tool's own default (ask) for boards that do not offer the menu.
+# Version this image reports, for boards that do not set it in boards.txt.
+build.fw_version=0.0.0
 build.ldscript=ldscript.ld
 build.variant_h=variant_generic.h
 
@@ -102,7 +106,7 @@ build.float-abi=
 build.flags.optimize=-Os
 build.flags.debug=-DNDEBUG
 build.flags.ldspecs=--specs=nano.specs
-build.flash_offset=0x40000
+build.flash_offset=0x20000
 
 # Pre and post build hooks
 build.opt.name=build.opt
@@ -113,8 +117,8 @@ extras.path={build.system.path}/extras
 # Create {build.opt} if not exists in the output sketch dir and force include of SrcWrapper library
 recipe.hooks.prebuild.1.pattern="{extras.path}/prebuild.sh" "{build.path}" "{build.source.path}" "{runtime.platform.path}"
 recipe.hooks.prebuild.1.pattern.windows="{runtime.tools.STM32Tools.path}/win/busybox.exe" sh "{extras.path}/prebuild.sh" "{build.path}" "{build.source.path}" "{runtime.platform.path}"
-recipe.hooks.postbuild.1.pattern="{extras.path}/postbuild.sh" "{build.path}" "{build.series}" "{runtime.platform.path}"
-recipe.hooks.postbuild.1.pattern.windows="{runtime.tools.STM32Tools.path}/win/busybox.exe" sh "{extras.path}/postbuild.sh" "{build.path}" "{build.series}" "{runtime.platform.path}"
+recipe.hooks.postbuild.1.pattern="{extras.path}/postbuild.sh" "{build.path}" "{build.series}" "{runtime.platform.path}" "{compiler.path}" "{build.project_name}"
+recipe.hooks.postbuild.1.pattern.windows="{runtime.tools.STM32Tools.path}/win/busybox.exe" sh "{extras.path}/postbuild.sh" "{build.path}" "{build.series}" "{runtime.platform.path}" "{compiler.path}" "{build.project_name}"
 
 # compile patterns
 # ---------------------
@@ -136,6 +140,9 @@ recipe.c.combine.pattern="{compiler.path}{compiler.c.elf.cmd}" {compiler.c.elf.f
 
 ## Create output (.bin file)
 recipe.objcopy.bin.pattern="{compiler.path}{compiler.objcopy.cmd}" {compiler.elf2bin.flags} {compiler.elf2bin.extra_flags} "{build.path}/{build.project_name}.elf" "{build.path}/{build.project_name}.bin"
+
+build.iaptool_dir=linux
+build.iaptool_dir.macosx=macosx
 
 ## Create output (.hex file)
 recipe.objcopy.hex.pattern="{compiler.path}{compiler.objcopy.cmd}" {compiler.elf2hex.flags} {compiler.elf2hex.extra_flags} "{build.path}/{build.project_name}.elf" "{build.path}/{build.project_name}.hex"
@@ -229,7 +236,7 @@ tools.cdctransfer.path.macosx={runtime.tools.STM32Tools.path}/macosx
 tools.cdctransfer.path.linux={runtime.tools.STM32Tools.path}/linux
 tools.cdctransfer.upload.params.verbose=
 tools.cdctransfer.upload.params.quiet=
-tools.cdctransfer.upload.pattern="{path}/{cmd}" "cdc" "{build.path}/{build.project_name}.bin" "{serial.port}"
+tools.cdctransfer.upload.pattern="{path}/{cmd}" "cdc" "{build.path}/{build.project_name}.bin" "{serial.port}" {upload.force_flag}
 
 # Upload using ETH Transfer  
 tools.ethtransfer.cmd=IAPTool
@@ -239,7 +246,19 @@ tools.ethtransfer.path.macosx={runtime.tools.STM32Tools.path}/macosx
 tools.ethtransfer.path.linux={runtime.tools.STM32Tools.path}/linux
 tools.ethtransfer.upload.params.verbose=
 tools.ethtransfer.upload.params.quiet=
-tools.ethtransfer.upload.pattern="{path}/{cmd}" "ether" "{build.path}/{build.project_name}.bin"
+tools.ethtransfer.upload.pattern="{path}/{cmd}" "ether" "{build.path}/{build.project_name}.bin" "{serial.port}" {upload.force_flag}
+
+# Pluggable discovery (network/IP ports)
+# -----------------------------------------------------------------------
+# Broadcasts a UDP "who's there" on the LAN (see udp_server.c /
+# IAP_config.h for the wire protocol) and lists responding boards as
+# network ports. Windows/Linux get an OS+arch binary directly; macOS
+# has no per-arch suffix in platform.txt so it goes through a small
+# arch-detecting launcher script instead. Rebuild all four binaries via
+# tools/discovery/build.sh (or build.ps1 on Windows).
+pluggable_discovery.network_discovery.pattern.windows="{runtime.platform.path}/tools/discovery/bin/windows_amd64/network_discovery.exe"
+pluggable_discovery.network_discovery.pattern.linux="{runtime.platform.path}/tools/discovery/bin/linux_amd64/network_discovery"
+pluggable_discovery.network_discovery.pattern.macosx="{runtime.platform.path}/tools/discovery/macos-launcher.sh"
 
 # Debugger configuration (general options)
 # ----------------------------------------

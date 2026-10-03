@@ -1,5 +1,5 @@
 /*
- * KNX_SelfTest — Board-level self-test for OpenPLC_KNX on STM32H743.
+ * KNX_SelfTest - Board-level self-test for OpenPLC_KNX on STM32H743.
  *
  * Does NOT require a connected KNX bus or ETS.  Reports results on Serial
  * (UART4 at 115200, routed to the debug connector).
@@ -8,13 +8,17 @@
  *   1. Relay 2-channel profile init (GPIO configuration)
  *   2. Relay channel on/off control and state read-back
  *   3. Application NVM save and reload (Flash Bank2 Sector7)
- *   4. TP bus-OK and VCC-OK status GPIO reads (passive — checks pin logic)
+ *   4. TP bus-OK and VCC-OK status GPIO reads (passive - checks pin logic)
  *   5. KNX individual address set/get round-trip
  *
  * Note: the IP stack (Ethernet + LwIP) must be initialised by the
  * application before KNX IP transport is tested.  This sketch only tests
  * the HAL-level board functions.
  */
+
+// Every sketch declares its own version. The upload tool compares it with
+// the one on the board and refuses to flash an older one over a newer one.
+OPENPLC_APP_VERSION(1, 0, 0);
 
 #include <OpenPLC_KNX.h>
 
@@ -80,7 +84,7 @@ void setup()
           KNXHelper.appConfig()->individual_addr == 0x1105u);
 
     /* ------------------------------------------------------------------
-     * 6. Status GPIOs — passive read (bus may not be connected).
+     * 6. Status GPIOs - passive read (bus may not be connected).
      * ------------------------------------------------------------------ */
     Serial.print("TP bus-OK pin (PD7): ");
     Serial.println(KNXHelper.tpBusOk() ? "HIGH" : "LOW");
@@ -96,5 +100,5 @@ void setup()
 
 void loop()
 {
-    /* Nothing — self-test runs once in setup(). */
+    /* Nothing - self-test runs once in setup(). */
 }
