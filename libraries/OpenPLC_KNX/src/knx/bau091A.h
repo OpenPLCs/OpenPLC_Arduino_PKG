@@ -7,7 +7,7 @@
 #include "router_object.h"
 #include "ip_parameter_object.h"
 #include "ip_data_link_layer.h"
-#include "tpuart_data_link_layer.h"
+#include "../stknx_data_link_layer.h"   /* OpenPLC: STKNX, not a TP-UART */
 #include "cemi_server_object.h"
 
 class Bau091A : public BauSystemBCoupler, public ITpUartCallBacks, public DataLinkLayerCallbacks
@@ -21,11 +21,10 @@ class Bau091A : public BauSystemBCoupler, public ITpUartCallBacks, public DataLi
         void syncCemiClientAddress();
 
         IpDataLinkLayer* getPrimaryDataLinkLayer();
-        TpUartDataLinkLayer* getSecondaryDataLinkLayer();
-    protected:
+        StknxDataLinkLayer* getSecondaryDataLinkLayer();
         InterfaceObject* getInterfaceObject(uint8_t idx);
         InterfaceObject* getInterfaceObject(ObjectType objectType, uint16_t objectInstance);
-
+    protected:
         // For TP1 only
         TPAckType isAckRequired(uint16_t address, bool isGrpAddr) override;
 
@@ -34,7 +33,7 @@ class Bau091A : public BauSystemBCoupler, public ITpUartCallBacks, public DataLi
         RouterObject _routerObj;
         IpParameterObject _ipParameters;
         IpDataLinkLayer _dlLayerPrimary;
-        TpUartDataLinkLayer _dlLayerSecondary;
+        StknxDataLinkLayer _dlLayerSecondary;
 #ifdef USE_CEMI_SERVER
         CemiServer _cemiServer;
         CemiServerObject _cemiServerObject;

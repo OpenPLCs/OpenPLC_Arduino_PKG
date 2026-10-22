@@ -157,7 +157,7 @@
 #define PC3_C                   PIN_A31
 
 /*----------------------------------------------------------------------------
- * OpenPLC Bridge MPU  —  hardware-signal aliases
+ * OpenPLC Bridge MPU  -  hardware-signal aliases
  *
  * Sources (Production/ folder):
  *   Bridge/1436_01_SCHAE-BR.pdf          Bridge MPU schematic (STM32H743IIK6)
@@ -166,15 +166,15 @@
  *   JunctionLink/Schematics/1434_01_SCHAE-JL.pdf
  *----------------------------------------------------------------------------*/
 
-/* Dual-pad ADC3 pins — direct internal path, better accuracy than normal GPIO */
+/* Dual-pad ADC3 pins - direct internal path, better accuracy than normal GPIO */
 #ifndef PC2_C
-#  define PC2_C   PIN_A30   /* PC2_C — ADC3_INP0 (D138) */
+#  define PC2_C   PIN_A30   /* PC2_C - ADC3_INP0 (D138) */
 #endif
 #ifndef PC3_C
-#  define PC3_C   PIN_A31   /* PC3_C — ADC3_INP1 (D139) */
+#  define PC3_C   PIN_A31   /* PC3_C - ADC3_INP1 (D139) */
 #endif
 
-/*-------- RELAY OUTPUTS — Lower Deck Klemmblock B -------------------------*/
+/*-------- RELAY OUTPUTS - Lower Deck Klemmblock B -------------------------*/
 /* Coil drive, active-high (GPIO_PIN_SET = relay closed)                     */
 /* Terminals: B01/B02=REL_1  B03/B04=REL_2  ...  B11/B12=REL_6             */
 #define REL_1   PI8    /* RELAIS_1                                           */
@@ -187,85 +187,83 @@
 #define REL_OUTA   1   /* coil-A polarity (active-high)                     */
 #define REL_OUTB   0   /* coil-B polarity                                   */
 
-/*-------- DIGITAL OUTPUTS — Lower Deck Klemmblock A (high-side FETs) ------*/
+/*-------- DIGITAL OUTPUTS - Lower Deck Klemmblock A (high-side FETs) ------*/
 /* All PWM-capable via hardware timers (see timer AF column)                 */
 /* Active-high: HIGH = FET on = load powered                                 */
 /* Terminals: A03=DO1  A04=DO2  ...  A10=DO8                                */
-#define DOUT_1  PB13   /* High-side FET 1 — TIM1_CH1N  (PWM)               */
-#define DOUT_2  PB0    /* High-side FET 2 — TIM1_CH2N  (PWM)               */
-#define DOUT_3  PH15   /* High-side FET 3 — TIM8_CH3N  (PWM)               */
-#define DOUT_4  PE4    /* High-side FET 4 — TIM15_CH1N (PWM)               */
-#define DOUT_5  PA8    /* High-side FET 5 — TIM1_CH1   (PWM)               */
-#define DOUT_6  PA9    /* High-side FET 6 — TIM1_CH2   (PWM)               */
-#define DOUT_7  PI7    /* High-side FET 7 — TIM8_CH3   (PWM)               */
-#define DOUT_8  PE5    /* High-side FET 8 — TIM15_CH1  (PWM)               */
+#define DOUT_1  PB13   /* High-side FET 1 - TIM1_CH1N  (PWM)               */
+#define DOUT_2  PB0    /* High-side FET 2 - TIM1_CH2N  (PWM)               */
+#define DOUT_3  PH15   /* High-side FET 3 - TIM8_CH3N  (PWM)               */
+#define DOUT_4  PE4    /* High-side FET 4 - TIM15_CH1N (PWM)               */
+#define DOUT_5  PA8    /* High-side FET 5 - TIM1_CH1   (PWM)               */
+#define DOUT_6  PA9    /* High-side FET 6 - TIM1_CH2   (PWM)               */
+#define DOUT_7  PI7    /* High-side FET 7 - TIM8_CH3   (PWM)               */
+#define DOUT_8  PE5    /* High-side FET 8 - TIM15_CH1  (PWM)               */
 
-/*-------- DIGITAL INPUTS — Upper Deck Klemmblock D ------------------------*/
+/*-------- DIGITAL INPUTS - Upper Deck Klemmblock D ------------------------*/
 /* All support hardware encoder counter mode (quadrature pairs noted)        */
 /* Terminals: D02=DI1  D03=DI2  ...  D09=DI8                                */
-#define DIN_1   PC6    /* Digital IN 1 — TIM3_CH1, encoder-1A               */
-#define DIN_2   PB5    /* Digital IN 2 — TIM3_CH2, encoder-1B               */
-#define DIN_3   PB6    /* Digital IN 3 — TIM4_CH1, encoder-2A               */
-#define DIN_4   PB7    /* Digital IN 4 — TIM4_CH2, encoder-2B               */
-#define DIN_5   PH10   /* Digital IN 5 — TIM5_CH1, encoder-3A               */
-#define DIN_6   PH11   /* Digital IN 6 — TIM5_CH2, encoder-3B               */
-#define DIN_7   PI5    /* Digital IN 7 — GPIO input                          */
-#define DIN_8   PI6    /* Digital IN 8 — GPIO input                          */
+#define DIN_1   PC6    /* Digital IN 1 - TIM3_CH1, encoder-1A               */
+#define DIN_2   PB5    /* Digital IN 2 - TIM3_CH2, encoder-1B               */
+#define DIN_3   PB6    /* Digital IN 3 - TIM4_CH1, encoder-2A               */
+#define DIN_4   PB7    /* Digital IN 4 - TIM4_CH2, encoder-2B               */
+#define DIN_5   PH10   /* Digital IN 5 - TIM5_CH1, encoder-3A               */
+#define DIN_6   PH11   /* Digital IN 6 - TIM5_CH2, encoder-3B               */
+#define DIN_7   PI5    /* Digital IN 7 - GPIO input                          */
+#define DIN_8   PI6    /* Digital IN 8 - GPIO input                          */
 
-/*-------- ANALOG INPUTS — Upper Deck Klemmblock D -------------------------*/
+/*-------- ANALOG INPUTS - Upper Deck Klemmblock D -------------------------*/
 /* Terminals: D12=AI1  D13=AI2                                               */
-#define AIN_1   PC3_C  /* Analog IN 1 — ADC3_INP1 (dual-pad direct path)   */
-#define AIN_2   PA6    /* Analog IN 2 — ADC1_INP3                           */
+#define AIN_1   PC3_C  /* Analog IN 1 - ADC3_INP1 (dual-pad direct path)   */
+#define AIN_2   PA6    /* Analog IN 2 - ADC1_INP3                           */
 
-/*-------- ANALOG OUTPUTS — Upper Deck Klemmblock D ------------------------*/
+/*-------- ANALOG OUTPUTS - Upper Deck Klemmblock D ------------------------*/
 /* Terminals: D14=AO1  D15=AO2                                               */
-#define AOUT_1      PA4  /* Analog OUT 1 — DAC1_OUT1                        */
-#define AOUT_2      PA5  /* Analog OUT 2 — DAC1_OUT2                        */
+#define AOUT_1      PA4  /* Analog OUT 1 - DAC1_OUT1                        */
+#define AOUT_2      PA5  /* Analog OUT 2 - DAC1_OUT2                        */
 #define AOUT_1_EF   PI4  /* Analog OUT 1 fault/enable (active-low)          */
 #define AOUT_2_EF   PE3  /* Analog OUT 2 fault/enable (active-low)          */
 
-/*-------- TEMPERATURE SENSORS — Lower Deck --------------------------------*/
-#define TEMP_SCPROT  PA0  /* Short-circuit protection NTC — ADC1_INP16      */
-#define TEMP_HSSW    PA3  /* High-side FET temperature NTC — ADC1_INP15     */
+/*-------- TEMPERATURE SENSORS - Lower Deck --------------------------------*/
+#define TEMP_SCPROT  PA0  /* Short-circuit protection NTC - ADC1_INP16      */
+#define TEMP_HSSW    PA3  /* High-side FET temperature NTC - ADC1_INP15     */
 
-/*-------- KNX PROGRAMMING INTERFACE — Upper Deck --------------------------*/
-/* KNX TP UART (USART1, PB14=TX AF4, PA10=RX AF7) defined in knx_config.h  */
-#define KNX_PROG_KEY    PG9    /* Programming button (active-low, EXTI9_5)  */
-#define KNX_PROG_LED    PG11   /* Programming LED    (active-high)          */
+/*-------- KNX PROGRAMMING INTERFACE --------------------------------------*/
+/* KNX TP: STKNX on PB14 / PA10, bits made by TIM12 / TIM1 (knx_config.h).  */
+/* Facts: $PROD/docs/hardware/HARDWARE-FACTS.md "KNX 接口", "PG9 就是 BOOT0 网" */
+#define KNX_PROG_KEY    PG9    /* Programming button, pressed = high; BOOT0 net */
+#define KNX_PROG_LED    PG11   /* Programming LED line - no LED fitted     */
 #define KNX_TP_OK       PD7    /* KNX bus status: HIGH = bus operational    */
 #define KNX_TP_VCC_OK   PH12   /* KNX transceiver VCC OK                   */
 
-/*-------- RS232 — Upper Deck Klemmblock C ---------------------------------*/
-/* USART3 AF7 — Terminals: C05=TxD, C06=RxD                                */
+/*-------- RS232 - Upper Deck Klemmblock C ---------------------------------*/
+/* USART3 AF7 - Terminals: C05=TxD, C06=RxD                                */
 #define RS232_UART_INSTANCE   3
-#define RS232_TX_Pin          PC10  /* USART3_TX → terminal C05             */
-#define RS232_RX_Pin          PC11  /* USART3_RX ← terminal C06             */
-#define RS232_EN_Pin          PB10  /* RS232 transceiver enable (active-high)*/
+#define RS232_TX          PC10  /* USART3_TX → terminal C05             */
+#define RS232_RX          PC11  /* USART3_RX ← terminal C06             */
+#define RS232_EN          PB10  /* RS232 transceiver enable (active-high)*/
 
-/*-------- RS485 — Upper Deck Klemmblock C ---------------------------------*/
-/* USART2 AF7 — Terminals: C09=RS485-A/B, C10=Direction                    */
+/*-------- RS485 - Upper Deck Klemmblock C ---------------------------------*/
+/* USART2 AF7. Terminals: $PROD/docs/hardware/HARDWARE-FACTS.md            */
 #define RS485_UART_INSTANCE   2
-#define RS485_TX_Pin          PD5   /* USART2_TX / RS485 DI                 */
-#define RS485_RX_Pin          PD6   /* USART2_RX / RS485 RO                 */
-#define RS485_DIR_Pin         PD4   /* RS485 direction (USART2_DE)          */
+#define RS485_TX              PD5   /* USART2_TX / RS485 DI                 */
+#define RS485_RX              PD6   /* USART2_RX / RS485 RO                 */
+#define RS485_DIR             PD4   /* RS485 direction (USART2_DE)          */
 
-/*-------- CAN — Upper Deck Klemmblock C -----------------------------------*/
-/* FDCAN1 — Terminals: C07=CAN-L, C08=CAN-H                                */
-#define CAN_TX_Pin   PB9   /* FDCAN1_TX → terminal C07                     */
-#define CAN_RX_Pin   PI9   /* FDCAN1_RX ← terminal C08                     */
+/*-------- CAN - Upper Deck Klemmblock C -----------------------------------*/
+/* FDCAN1 - Terminals: C07=CAN-L, C08=CAN-H                                */
+#define CAN_TX       PB9   /* FDCAN1_TX → terminal C07                     */
+#define CAN_RX       PI9   /* FDCAN1_RX ← terminal C08                     */
 
-/*-------- USB — Bridge MPU ------------------------------------------------*/
+/*-------- USB - Bridge MPU ------------------------------------------------*/
 /* USB Full-Speed Device (USB-C connector)                                   */
 #define USB_DM_Pin   PA11  /* USB_FS2_D_N (D-)                              */
 #define USB_DP_Pin   PA12  /* USB_FS2_D_P (D+)                              */
 
-/*-------- SD CARD — Bridge MPU (SDMMC1, 1-bit mode) ----------------------*/
-#define SDMMC_CLK_Pin  PC12  /* SDMMC1_CK                                   */
-#define SDMMC_CMD_Pin  PD2   /* SDMMC1_CMD                                  */
-#define SDMMC_D0_Pin   PC8   /* SDMMC1_D0                                   */
-#define SDMMC_CD_Pin   PE6   /* Card detect (active-low)                    */
+/*-------- SD CARD - Bridge MPU (SDMMC1, 1-bit mode) ----------------------*/
+#define SDMMC_CD   PE6   /* Card detect (active-low)                        */
 
-/*-------- SPI6 — JunctionLink expansion connector -------------------------*/
+/*-------- SPI6 - JunctionLink expansion connector -------------------------*/
 /* SPI2 is the primary SPI (uses PIN_SPI_* below); SPI6 is secondary        */
 #define SPI6_MOSI_Pin  PG14  /* SPI6_MOSI                                   */
 #define SPI6_MISO_Pin  PB4   /* SPI6_MISO                                   */
@@ -274,6 +272,73 @@
 /*-------- DEBUG -----------------------------------------------------------*/
 #define DEBUG_TRIGGER_Pin  PC7  /* Logic-analyser trigger point             */
 
+/*-------- SDRAM (FMC) - DO NOT DRIVE THESE --------------------------------*/
+/* The 39 pins below are wired to the on-board AS4C32M16SB SDRAM (64 MB at
+ * 0xC0000000) and nothing else. They are listed here because this variant
+ * registers every MCU pin as an Arduino digital pin (NUM_DIGITAL_PINS 140),
+ * so digitalWrite(PE7, HIGH) compiles, runs, and pulls an SDRAM data line
+ * down. The symptom is memory that occasionally reads back garbage, with no
+ * hint connecting it to the line that caused it.
+ *
+ * These names do NOT block anything -- they exist so the pins are visible
+ * here rather than only in the bootloader's fmc.c. Driving one is still
+ * possible; it is just no longer accidental.
+ *
+ * Not a layout conflict: none of these collide with any external I/O of this
+ * board (DOUT/DIN/AIN/AOUT/RS232/RS485/CAN/KNX). It was a missing guard, not
+ * a wiring mistake.
+ *
+ * Source of truth: OpenPLC_BootLoader Core/Src/fmc.c, the FMC GPIO
+ * Configuration comment block in HAL_FMC_MspInit(). Keep in step with it.  */
+
+/* 16-bit data bus */
+#define FMC_RESERVED_D0    PD14
+#define FMC_RESERVED_D1    PD15
+#define FMC_RESERVED_D2    PD0
+#define FMC_RESERVED_D3    PD1
+#define FMC_RESERVED_D4    PE7
+#define FMC_RESERVED_D5    PE8
+#define FMC_RESERVED_D6    PE9
+#define FMC_RESERVED_D7    PE10
+#define FMC_RESERVED_D8    PE11
+#define FMC_RESERVED_D9    PE12
+#define FMC_RESERVED_D10   PE13
+#define FMC_RESERVED_D11   PE14
+#define FMC_RESERVED_D12   PE15
+#define FMC_RESERVED_D13   PD8
+#define FMC_RESERVED_D14   PD9
+#define FMC_RESERVED_D15   PD10
+
+/* 13-bit row/column address bus */
+#define FMC_RESERVED_A0    PF0
+#define FMC_RESERVED_A1    PF1
+#define FMC_RESERVED_A2    PF2
+#define FMC_RESERVED_A3    PF3
+#define FMC_RESERVED_A4    PF4
+#define FMC_RESERVED_A5    PF5
+#define FMC_RESERVED_A6    PF12
+#define FMC_RESERVED_A7    PF13
+#define FMC_RESERVED_A8    PF14
+#define FMC_RESERVED_A9    PF15
+#define FMC_RESERVED_A10   PG0
+#define FMC_RESERVED_A11   PG1
+#define FMC_RESERVED_A12   PG2
+
+/* Bank select, byte enables, clock and command strobes */
+#define FMC_RESERVED_BA0     PG4   /* bank address 0                        */
+#define FMC_RESERVED_BA1     PG5   /* bank address 1                        */
+#define FMC_RESERVED_NBL0    PE0   /* byte enable, low  byte                */
+#define FMC_RESERVED_NBL1    PE1   /* byte enable, high byte                */
+#define FMC_RESERVED_SDCLK   PG8   /* SDRAM clock (D1HCLK/2, 100 MHz)       */
+#define FMC_RESERVED_SDCKE0  PH2   /* clock enable, bank 1                  */
+#define FMC_RESERVED_SDNE0   PH3   /* chip select, bank 1                   */
+#define FMC_RESERVED_SDNRAS  PF11  /* row address strobe                    */
+#define FMC_RESERVED_SDNCAS  PG15  /* column address strobe                 */
+#define FMC_RESERVED_SDNWE   PC0   /* write enable                          */
+
+/* Count is asserted so a pin added to fmc.c without being mirrored here
+ * cannot pass unnoticed: 16 data + 13 address + 10 control = 39.           */
+#define FMC_RESERVED_PIN_COUNT  39
 
 
 // Alternate pins number
@@ -349,7 +414,7 @@
   #define USER_BTN              PNUM_NOT_DEFINED
 #endif
 
-// SPI definitions — SPI2 on JunctionLink expansion connector
+// SPI definitions - SPI2 on JunctionLink expansion connector
 #ifndef PIN_SPI_SS
   #define PIN_SPI_SS            PI0    /* SPI2_NSS  */
 #endif
@@ -372,7 +437,7 @@
   #define PIN_SPI_SCK           PI1    /* SPI2_SCK  */
 #endif
 
-// I2C definitions — I2C2 on JunctionLink expansion connector (PH4=SCL, PH5=SDA)
+// I2C definitions - I2C2 on JunctionLink expansion connector (PH4=SCL, PH5=SDA)
 #ifndef PIN_WIRE_SDA
   #define PIN_WIRE_SDA          PH5    /* I2C2_SDA (AF4) */
 #endif
@@ -392,7 +457,7 @@
 // UART Definitions
 // UART4 on JunctionLink expansion connector (PH13=TX, PH14=RX, AF8)
 // When USB CDC is selected in Arduino IDE, 'Serial' maps to USB and these
-// pins become Serial1 (hardware UART4).
+// pins become Serial4 (hardware UART4).
 #ifndef SERIAL_UART_INSTANCE
   #define SERIAL_UART_INSTANCE  4
 #endif
@@ -401,6 +466,21 @@
 #endif
 #ifndef PIN_SERIAL_TX
   #define PIN_SERIAL_TX         PH13   /* UART4_TX on JunctionLink connector */
+#endif
+
+// The core's debug UART. Nothing in the core uses it: printf / stdout go to
+// the system log (_write() in cores/arduino/Print.cpp, R3-22). Left on USART3
+// (AF7) on PC10/PC11 rather than the default, UART4, which is the expansion
+// port's peripheral (PIN_SERIAL_TX/RX above).
+// DEBUG_PINNAME_TX must stay explicit -- without it the core takes the first
+// USART3 TX row in PeripheralPins.c, which on this board is PB10 = RS232_EN.
+// Pinned by case P4 (TestCase/host/variant_check/uart_routing/).
+// Routing table: $PROD/docs/hardware/HARDWARE-FACTS.md, "UART4 与 USART3".
+#ifndef DEBUG_UART
+  #define DEBUG_UART            USART3
+#endif
+#ifndef DEBUG_PINNAME_TX
+  #define DEBUG_PINNAME_TX      PC_10_ALT1
 #endif
 
 // Extra HAL modules
@@ -420,6 +500,21 @@
 #endif
 #if !defined(HAL_SD_MODULE_DISABLED)
   #define HAL_SD_MODULE_ENABLED
+#endif
+/* The microSD socket wires only D0 (see PinMap_SD), so the STM32SD library
+ * must stay on a 1-bit bus. */
+#if !defined(SD_BUS_WIDE)
+  #define SD_BUS_WIDE           SDMMC_BUS_WIDE_1B
+#endif
+/* Needed by the OpenPLC_Ports CAN wrapper (FDCAN1 on PB9 / PI9). */
+#if !defined(HAL_FDCAN_MODULE_DISABLED)
+  #define HAL_FDCAN_MODULE_ENABLED
+#endif
+/* Needed by the OpenPLC_SDRAM library for the on-board 64 MB AS4C32M16SB.
+ * Without it that library still compiles, but every call fails closed -- see
+ * the #else branch at the bottom of OpenPLC_SDRAM.cpp. */
+#if !defined(HAL_SDRAM_MODULE_DISABLED)
+  #define HAL_SDRAM_MODULE_ENABLED
 #endif
 
 /*----------------------------------------------------------------------------

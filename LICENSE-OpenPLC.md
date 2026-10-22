@@ -5,6 +5,7 @@ The libraries in `libraries/OpenPLC_*` are written by Schaeffer AG for the OpenP
 Third-party code inside those directories keeps its own license:
 
 - `libraries/OpenPLC_KNX/src/knx/`: a copy of [thelsing/knx](https://github.com/thelsing/knx), GPL-3.0 (see the header of each file).
+- `libraries/OpenPLC_IAP/src/uecc/`: micro-ecc, BSD 2-Clause (see `LICENSE.txt` there).
 - Any other file that carries its own copyright or license header keeps that license.
 
 Everything outside `libraries/OpenPLC_*` is covered by [License.md](License.md).

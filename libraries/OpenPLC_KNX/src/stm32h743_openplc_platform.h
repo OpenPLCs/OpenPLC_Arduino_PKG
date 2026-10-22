@@ -4,13 +4,12 @@
  * stm32h743_openplc_platform.h
  *
  * Concrete Platform implementation for the OpenPLC Bridge board (STM32H743).
- * Inherits directly from Platform (not ArduinoPlatform) — pure HAL + LwIP.
+ * Inherits directly from Platform (not ArduinoPlatform) - pure HAL + LwIP.
  *
  * Responsibilities:
- *   UART   — USART1 interrupt-driven RX ring-buffer (STKNX TP transceiver)
- *   IP     — LwIP UDP multicast (KNXnet/IP routing)
- *   NVM    — HAL Flash erase/program (Bank 2 Sector 6, reference library data)
- *   System — HAL_GetUID, NVIC_SystemReset, netif_default
+ *   IP     - LwIP UDP multicast (KNXnet/IP routing)
+ *   NVM    - HAL Flash erase/program (Bank 2 Sector 6, reference library data)
+ *   System - HAL_GetUID, NVIC_SystemReset, netif_default
  */
 
 #include <stdint.h>
@@ -25,20 +24,14 @@ extern "C" {
 #include "lwip/netif.h"
 }
 
-/* Must be defined before pulling in any reference-library header */
+/* MASK_VERSION comes from the sketch's OPENPLC_KNX_ROLE() line, through the
+ * header prebuild.sh generates and force-includes into every unit.
+ * $PROD/docs/modules/M3-app-runtime.md R3-24 */
 #ifndef MASK_VERSION
-#  define MASK_VERSION 0x5780u   /* IP+TP dual device by default; no menu selection needed */
+#  error "OpenPLC_KNX: no KNX role. Add OPENPLC_KNX_ROLE(TP_DEVICE); or OPENPLC_KNX_ROLE(IP_ROUTER); on its own line in the .ino file"
 #endif
 #ifndef KNX_NO_AUTOMATIC_GLOBAL_INSTANCE
 #  define KNX_NO_AUTOMATIC_GLOBAL_INSTANCE
-#endif
-
-/* Suppress the reference library's global print/println free-function
- * declarations.  On ARDUINO_ARCH_STM32 the implementations are never
- * provided (bits.cpp only implements them for ESP_PLATFORM), which causes
- * linker errors.  The KNX stack debug output is not needed in production. */
-#ifndef KNX_NO_PRINT
-#  define KNX_NO_PRINT
 #endif
 
 #include <knx/platform.h>
@@ -56,6 +49,7 @@ public:
 
     /* --- System -------------------------------------------------------- */
     void     restart()            override;
+    void     restartRequested(bool masterReset, uint8_t eraseCode) override;
     void     fatalError()         override;
     uint32_t uniqueSerialNumber() override;
 
@@ -64,17 +58,6 @@ public:
     uint32_t currentSubnetMask()     override;
     uint32_t currentDefaultGateway() override;
     void     macAddress(uint8_t* data) override;
-
-    /* --- UART (STKNX via USART1, interrupt-driven) --------------------- */
-    void   setupUart()                                     override;
-    void   closeUart()                                     override;
-    int    uartAvailable()                                 override;
-    size_t writeUart(const uint8_t data)                   override;
-    size_t writeUart(const uint8_t* buffer, size_t size)   override;
-    int    readUart()                                      override;
-    size_t readBytesUart(uint8_t* buffer, size_t length)   override;
-    bool   overflowUart()                                  override;
-    void   flushUart()                                     override;
 
     /* --- IP multicast (LwIP UDP) --------------------------------------- */
     void setupMultiCast(uint32_t addr, uint16_t port)              override;
@@ -90,17 +73,7 @@ public:
     uint8_t* getEepromBuffer(uint32_t size) override;
     void     commitToEeprom()               override;
 
-    /* Called from USART1_IRQHandler — do not call from application code */
-    void _uartRxByteISR(uint8_t byte);
-
 private:
-    /* UART */
-    UART_HandleTypeDef  _huart;
-    uint8_t             _uartRxBuf[KNX_UART_RXBUF_SIZE];
-    volatile uint16_t   _uartRxHead;  /* write index (ISR) */
-    volatile uint16_t   _uartRxTail;  /* read index (main) */
-    volatile bool       _uartOverflow;
-
     /* LwIP UDP multicast */
     struct udp_pcb *_udpPcb;
     ip4_addr_t      _mcastAddr;
@@ -113,10 +86,6 @@ private:
     /* NVM (Eeprom type) */
     uint8_t *_eepromBuf;
     uint32_t _eepromSize;
-
-    /* HAL Flash helpers */
-    bool _flashEraseSector(uint32_t bank, uint32_t sector);
-    bool _flashWriteBuffer(uint32_t addr, const uint8_t* data, size_t size);
 
     /* LwIP receive callback (static → routes to instance) */
     static void _udpRecvCb(void* arg, struct udp_pcb* pcb, struct pbuf* p,

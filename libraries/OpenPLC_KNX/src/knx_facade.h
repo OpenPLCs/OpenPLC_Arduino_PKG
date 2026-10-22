@@ -1,37 +1,32 @@
 #pragma once
 
 /*
- * knx_facade.h — stripped for STM32H743 / OpenPLC only.
+ * knx_facade.h - stripped for STM32H743 / OpenPLC only.
  *
  * All non-STM32H743 platform branches (ESP32, RP2040, SAMD, Linux, CC1310,
  * LibreTiny …) have been removed.  The only supported configuration is:
  *
  *   Platform : Stm32H743OpenPLCPlatform   (inherits Platform directly)
  *   BAU      : Bau07B0  (MASK_VERSION 0x07B0, TP device)
- *           or Bau57B0  (MASK_VERSION 0x57B0, IP device)
- *           or Bau091A  (MASK_VERSION 0x091A, IP/TP1 coupler)
+ *           or Bau091A  (MASK_VERSION 0x091A, IP router / IP-TP1 coupler)
  *
- * KNX_NO_AUTOMATIC_GLOBAL_INSTANCE is always defined — the global KNX
- * instance is created explicitly in OpenPLC_KNX.cpp.
+ * KNX_NO_AUTOMATIC_GLOBAL_INSTANCE is always defined - the one instance
+ * (knxStack, internal) is created in OpenPLC_KNX.cpp.
  */
 
-/* Bug 1 fix: MASK_VERSION must be defined before knx/config.h checks it.
- * stm32h743_openplc_platform.h (included below) also sets this default,
- * but it comes after the config.h include.  Set it here so a direct
- * #include "knx_facade.h" also works without the platform header first. */
+/* MASK_VERSION must be set before knx/config.h checks it; it comes from the
+ * sketch's OPENPLC_KNX_ROLE() line (see stm32h743_openplc_platform.h). */
 #ifndef MASK_VERSION
-#  define MASK_VERSION 0x5780u   /* IP+TP dual device — both transports active */
+#  error "OpenPLC_KNX: no KNX role. Add OPENPLC_KNX_ROLE(TP_DEVICE); or OPENPLC_KNX_ROLE(IP_ROUTER); on its own line in the .ino file"
 #endif
 
 #include "knx/bits.h"
 #include "knx/config.h"
 #include "knx/bau07B0.h"
 #include "knx/bau091A.h"
-#include "knx/bau57B0.h"
-#include "knx/bau5780.h"
 
-/* Our platform — already defines KNX_NO_AUTOMATIC_GLOBAL_INSTANCE and
- * MASK_VERSION if not set by the user.  Include it exactly once here. */
+/* Our platform - already defines KNX_NO_AUTOMATIC_GLOBAL_INSTANCE.
+ * Include it exactly once here. */
 #include "stm32h743_openplc_platform.h"
 
 #ifndef USERDATA_SAVE_SIZE
@@ -237,7 +232,7 @@ template <class P, class B> class KnxFacade : private SaveRestore
             _bau.deviceObject().version(value);
         }
 
-        /* start() — sets up LED pin if ledPin >= 0, button pin if buttonPin >= 0.
+        /* start() - sets up LED pin if ledPin >= 0, button pin if buttonPin >= 0.
          * For STM32H743 we set both to -1 and use HAL callbacks instead,
          * so this reduces to enabled(true). */
         void start()
@@ -319,9 +314,8 @@ template <class P, class B> class KnxFacade : private SaveRestore
             return _bau.parameters().getFloat(addr, enc);
         }
 
-/* getGroupObject is only valid for application devices (TP or IP).
- * Bau091A (coupler) inherits BauSystemBCoupler which has no GroupObjectTable. */
-#if (MASK_VERSION == 0x07B0) || (MASK_VERSION == 0x57B0)
+/* Only a device has group objects; Bau091A (coupler) has no GroupObjectTable. */
+#if MASK_VERSION == 0x07B0
         GroupObject& getGroupObject(uint16_t goNr)
         {
             return _bau.groupObjectTable().get(goNr);
@@ -344,7 +338,7 @@ template <class P, class B> class KnxFacade : private SaveRestore
             return _bau.beforeRestartCallback();
         }
 
-        /* Expose interface object lookup — used by selfProgram helpers to access
+        /* Expose interface object lookup - used by selfProgram helpers to access
          * table objects (AddrTable=1, AssocTable=2, GroupObjTable=3, AppProg=4). */
         InterfaceObject* getInterfaceObject(uint8_t idx)
         {
@@ -400,4 +394,4 @@ template <class P, class B> class KnxFacade : private SaveRestore
         }
 };
 
-/* No automatic global instance — OpenPLC_KNX.cpp creates it explicitly. */
+/* No automatic global instance - OpenPLC_KNX.cpp creates it explicitly. */

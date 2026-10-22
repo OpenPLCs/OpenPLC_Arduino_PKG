@@ -88,8 +88,10 @@ typedef struct
   uint8_t buff[(ETH_RX_BUFFER_SIZE + 31) & ~31] __ALIGNED(32);
 } RxBuff_t;
 
-/* Memory Pool Declaration */
-#define ETH_RX_BUFFER_CNT             4U
+/* Memory Pool Declaration.
+ * Kept equal to the bootloader's value so both images lay out .Rx_PoolSection
+ * identically -- see the .lwip_sec block in ldscript.ld for the arithmetic. */
+#define ETH_RX_BUFFER_CNT             12U
 LWIP_MEMPOOL_DECLARE(RX_POOL, ETH_RX_BUFFER_CNT, sizeof(RxBuff_t), "Zero-copy RX PBUF pool");
 
 /* Variable Definitions */
@@ -161,6 +163,9 @@ static void openplc_make_mac_from_uid(uint8_t mac[6]);
 
 /* USER CODE END 4 */
 #if !defined(MAC_ADDR0) || !defined(MAC_ADDR1) || !defined(MAC_ADDR2) || !defined(MAC_ADDR3) || !defined(MAC_ADDR4) || !defined(MAC_ADDR5)
+/* Mirrors the USER CODE MACADDRESS block in the bootloader's
+ * LWIP/Target/ethernetif.c. Why, and the derivation itself:
+ * $PROD/docs/modules/M1/BOOT-SEQUENCE.md "MAC 地址从芯片 UID 派生". */
 static void openplc_make_mac_from_uid(uint8_t mac[6])
 {
   uint32_t u0 = HAL_GetUIDw0();
