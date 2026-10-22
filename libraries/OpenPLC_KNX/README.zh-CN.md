@@ -23,7 +23,7 @@ OPENPLC_KNX_ROLE(TP_DEVICE);   // 或 OPENPLC_KNX_ROLE(IP_ROUTER);
 两种都是 ETS 认识的 mask，ETS 都能给板子编程。
 角色不变时，ETS 下载的内容在重新上传 sketch 后仍然保留。换了角色，或者板子是用更早的板卡包编程的，
 开机时会丢弃这些数据（日志 `ETS has to reprogram PA and application!`），按未编程运行，直到 ETS 重新下载。
-先从 [OpenPLC_ETS_Prod](https://github.com/haliboteda/OpenPLC_ETS_Prod) 下载 ETS 产品文件 `OpenPLC_TP.knxprod` 导入 ETS。
+先从 [OpenPLC_ETS_Prod](https://github.com/OpenPLCs/OpenPLC_ETS_Prod) 下载 ETS 产品文件 `OpenPLC_TP.knxprod` 导入 ETS。
 
 | 例程 | 角色 | 演示什么 |
 |---|---|---|

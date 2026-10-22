@@ -28,7 +28,7 @@ Both are masks ETS knows, so ETS can program the board in either role.
 What ETS downloaded survives sketch uploads as long as the role stays the same. After a role change,
 or on a board programmed with an earlier board package, the board discards that data at start-up
 (log: `ETS has to reprogram PA and application!`) and runs unprogrammed until ETS downloads it again.
-Import the ETS product file `OpenPLC_TP.knxprod` from [OpenPLC_ETS_Prod](https://github.com/haliboteda/OpenPLC_ETS_Prod) first.
+Import the ETS product file `OpenPLC_TP.knxprod` from [OpenPLC_ETS_Prod](https://github.com/OpenPLCs/OpenPLC_ETS_Prod) first.
 
 | Example | Role | Shows |
 |---|---|---|
