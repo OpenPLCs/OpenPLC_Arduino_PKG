@@ -32,7 +32,7 @@ bool knx_nvm_sector_write(const uint8_t *stack, uint32_t stack_len)
     HAL_FLASH_Unlock();
 
     // VoltageRange is ORed into FLASH_CR; a stale value can set BER and erase
-    // the whole bank, bootloader state included. See KEX-13 in $PROD.
+    // the whole bank, bootloader state included.
     FLASH_EraseInitTypeDef eraseInit = {0};
     eraseInit.TypeErase    = FLASH_TYPEERASE_SECTORS;
     eraseInit.VoltageRange = FLASH_VOLTAGE_RANGE_3;
