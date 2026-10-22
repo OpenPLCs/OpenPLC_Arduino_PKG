@@ -79,7 +79,7 @@ def main():
 
     n = len(only_live) + len(diff)
     if n:
-        Fail("%d file(s) verified in live but not in the repo -- copy them across and commit" % n)
+        Fail("%d file(s) differ between live and the repo -- copy the live ones across now" % n)
         return 1
     if only_repo:
         Warn("live matches the repo, but %d file(s) exist only in the repo" % len(only_repo))

@@ -6,6 +6,7 @@
 
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
+#include "lwip/ip.h"         /* ip_current_dest_addr, ip_current_netif */
 #include "lwip/ip_addr.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
@@ -14,6 +15,7 @@
 #include "openplc_app_version.h"   /* the sketch defines openplc_app_version */
 #include "IAP_boot_handoff.h"
 #include "boot_log.h"
+#include "openplc_syslog.h"   /* openplc_identify_blink_request */
 #include "iap_auth.h"
 #include "iap_cert.h"
 #include "iap_keyderive.h"
@@ -301,6 +303,13 @@ static void udp_server_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
       pbuf_free(p);
     }
     return;
+  }
+
+  /* R3-25 / decision 161: only a request sent to this board alone blinks;
+   * IDE discovery is broadcast and would blink every board on the LAN. */
+  if (!ip_addr_isbroadcast(ip_current_dest_addr(), ip_current_netif()) &&
+      !ip_addr_ismulticast(ip_current_dest_addr())) {
+    openplc_identify_blink_request();
   }
 
   /* "openplc_server_reboot <cert_hex> <noncesig_hex>" is ~408 bytes. */

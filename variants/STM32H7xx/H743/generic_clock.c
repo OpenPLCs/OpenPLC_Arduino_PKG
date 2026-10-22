@@ -100,6 +100,17 @@ WEAK void SystemClock_Config(void)
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
     Error_Handler();
   }
+  /* USB runs on HSI48, which needs CRS trimming against the USB SOF to meet
+   * the full-speed accuracy. $PROD/docs/tables/DECISIONS.md, decision 157 */
+  RCC_CRSInitTypeDef RCC_CRSInitStruct = {};
+  __HAL_RCC_CRS_CLK_ENABLE();
+  RCC_CRSInitStruct.Prescaler = RCC_CRS_SYNC_DIV1;
+  RCC_CRSInitStruct.Source = RCC_CRS_SYNC_SOURCE_USB2;
+  RCC_CRSInitStruct.Polarity = RCC_CRS_SYNC_POLARITY_RISING;
+  RCC_CRSInitStruct.ReloadValue = __HAL_RCC_CRS_RELOADVALUE_CALCULATE(48000000, 1000);
+  RCC_CRSInitStruct.ErrorLimitValue = RCC_CRS_ERRORLIMIT_DEFAULT;
+  RCC_CRSInitStruct.HSI48CalibrationValue = RCC_CRS_HSI48CALIBRATION_DEFAULT;
+  HAL_RCCEx_CRSConfig(&RCC_CRSInitStruct);
 }
 
 #endif /* ARDUINO_GENERIC_* */

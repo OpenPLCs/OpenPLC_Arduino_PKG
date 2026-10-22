@@ -108,11 +108,13 @@ static void send_line(const char *line, size_t len, uint32_t seq, void *ctx)
 
 extern "C" USBD_HandleTypeDef hUSBD_Device_CDC;
 extern "C" __IO bool dtrState;
+#endif
 
-/* R3-25: the host opening USB port 1 (DTR clear -> set) blinks the heartbeat
- * LED (LED3 on PE2, high = on, $PROD/docs/hardware/HARDWARE-FACTS.md) for
- * about 2 s, then hands PE2 back in the mode and level it had. Changes the
- * sketch makes to PE2 meanwhile become what is handed back. */
+/* R3-25: the host opening USB port 1 (DTR clear -> set) or a unicast request
+ * to the app's UDP server (decision 161) blinks the heartbeat LED (LED3 on
+ * PE2, high = on, $PROD/docs/hardware/HARDWARE-FACTS.md) for about 2 s, then
+ * hands PE2 back in the mode and level it had. Changes the sketch makes to
+ * PE2 meanwhile become what is handed back. */
 #define BLINK_MS       2000U
 #define BLINK_HALF_MS  50U
 #define LED_PIN        2U
@@ -136,9 +138,15 @@ static void led_set(uint32_t level)
   GPIOE->BSRR = (level != 0U) ? LED_BIT : (LED_BIT << 16);
 }
 
-static void port_open_blink(void)
+static volatile bool s_net_request;
+
+extern "C" void openplc_identify_blink_request(void)
 {
-  static bool s_was_open;
+  s_net_request = true;
+}
+
+static void identify_blink(void)
+{
   static bool s_blinking;
   static uint32_t s_start;
   static uint32_t s_toggled;
@@ -146,10 +154,22 @@ static void port_open_blink(void)
   static uint32_t s_otype;
   static uint32_t s_level;
   static uint32_t s_wrote;  // ODR bit last written here
-  bool open = (hUSBD_Device_CDC.dev_state == USBD_STATE_CONFIGURED) && dtrState;
+  bool start = false;
   uint32_t now = HAL_GetTick();
 
-  if (open && !s_was_open) {
+#if defined(USBCON) && defined(USBD_USE_CDC)
+  static bool s_was_open;
+  bool open = (hUSBD_Device_CDC.dev_state == USBD_STATE_CONFIGURED) && dtrState;
+
+  start = open && !s_was_open;
+  s_was_open = open;
+#endif
+  if (s_net_request) {
+    s_net_request = false;
+    start = true;
+  }
+
+  if (start) {
     if (!s_blinking) {
       __HAL_RCC_GPIOE_CLK_ENABLE();
       s_mode = GPIOE->MODER & LED_MODE_MASK;
@@ -163,7 +183,6 @@ static void port_open_blink(void)
     led_set(s_wrote);
     led_take();
   }
-  s_was_open = open;
   if (!s_blinking) {
     return;
   }
@@ -194,26 +213,26 @@ static void port_open_blink(void)
     led_set(s_wrote);
   }
 }
-#endif
 
 extern "C" void openplc_syslog_service(void)
 {
-#if defined(USBCON) && defined(USBD_USE_CDC)
   static bool s_busy;
-  send_ctx s = {0U, false};
 
   if (s_busy) {
     return;
   }
   s_busy = true;
-  port_open_blink();
+  identify_blink();
+#if defined(USBCON) && defined(USBD_USE_CDC)
+  send_ctx s = {0U, false};
+
   // CDC_connected(): configured, DTR set, and the host is still reading.
   if (log_on() && CDC_connected()) {
     (void)boot_log_read_unsent(send_line, &s);
     boot_log_mark_sent(s.next);
   }
-  s_busy = false;
 #endif
+  s_busy = false;
 }
 
 /* ---- Fault handlers: one [sys][FAULT] record, then reset (R3-22). ------- */

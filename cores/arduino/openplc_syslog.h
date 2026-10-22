@@ -39,8 +39,14 @@ void openplc_syslog_stdout(const char *ptr, size_t len);
 /* Sends records not yet sent to USB port 1 while DTR is set, then marks them
  * sent. Main context only; called from the main loop and yield(). Sends
  * nothing when DTR is clear or the log is OFF. Also runs the heartbeat LED
- * blink on a DTR rising edge (R3-25), whether the log is ON or OFF. */
+ * blink on a DTR rising edge or a network request (R3-25), whether the log is
+ * ON or OFF. */
 void openplc_syslog_service(void);
+
+/* Starts (or restarts) the ~2 s heartbeat LED blink on the next service call.
+ * Only sets a flag; the UDP server calls it for a unicast request (R3-25,
+ * decision 161). */
+void openplc_identify_blink_request(void);
 
 #ifdef __cplusplus
 }
