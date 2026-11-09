@@ -22,6 +22,10 @@
 #include "owner_root_ro.h"
 #include "fw_meta_ro.h"
 
+#if defined(USBCON) && defined(USBD_USE_CDC)
+#include "usbd_cdc_if.h"   /* CDC_iap_* : USB IAP mode, decision 176 */
+#endif
+
 #define REBOOT_COOLDOWN_MS 10000U
 static uint32_t s_last_reboot_tick = 0u;
 
@@ -83,16 +87,16 @@ static void openplc_udp_reply(struct udp_pcb *pcb, const ip_addr_t *addr, u16_t 
 }
 
 /*
- * Ask the bootloader to stay in ethernet upload mode after the next reset.
- * boot_handoff_request() verifies the record landed before it resets.
+ * Ask the bootloader to stay in upload mode on the channel the request came
+ * in on. boot_handoff_request() verifies the record landed before it resets.
  */
-static void openplc_set_eth_flag_and_reset(void)
+static void openplc_set_boot_flag_and_reset(boot_req_t channel)
 {
   /* Does not return on success. If it returns, the request was not stored, so
    * resetting would be worse than useless: the board would come straight back
    * into the app and the operator would see "no response" all over again. */
-  if (!boot_handoff_request(BOOT_REQ_ETH)) {
-    printf("Refusing to reset: ethernet boot request could not be stored\r\n");
+  if (!boot_handoff_request(channel)) {
+    printf("Refusing to reset: boot request could not be stored\r\n");
   }
 }
 
@@ -293,6 +297,98 @@ static bool iap_query_reply(const char *name, char *out, size_t out_len)
   return true;
 }
 
+/* Sends one reply on whichever channel the command came in on. */
+typedef void (*iap_reply_fn)(const char *msg, void *ctx);
+
+/* The IAP commands the app answers, the same on UDP and in USB IAP mode
+ * (decisions 148, 176). openplc_log is UDP-only and handled by the caller.
+ * Formats: $PROD/docs/modules/M1/IAP-PROTOCOL.md. */
+static void iap_dispatch(const char *cmd, iap_reply_fn reply, void *ctx, boot_req_t channel)
+{
+  char query_msg[IAP_QUERY_REPLY_MAX];
+
+  if ((strcmp(cmd, "DISCOVER") == 0) ||
+      (strcmp(cmd, "openplc_discover") == 0) ||
+      (strcmp(cmd, "openplc_server_where_r_y") == 0) ||
+      (strcmp(cmd, "ping") == 0)) {
+    /* Identity string contract, shared with the bootloader's
+     * iap_identity_string() (OpenPLC_BootLoader/IAPServer/IAP_server.c): the PC
+     * tool splits it on "_", so it is exactly five fields --
+     * name_uid_role_pkgversion_appversion -- and no field may contain an
+     * underscore. The bootloader has nothing to report for the last one and
+     * sends "-" there. The two repositories cannot share the code, so changing
+     * one means changing both; the pair is tracked as a cross-repo mirror in
+     * $PROD/docs/repo/ARCHITECTURE.md. */
+    char uid_hex[IAP_MACHINE_ID_HEX_LEN + 1U] = {0};
+    char reply_msg[96] = {0};
+
+    if (!discovery_reply_allowed()) {
+      return;
+    }
+
+    iap_keyderive_get_machine_id_hex(uid_hex);
+    (void)snprintf(reply_msg, sizeof(reply_msg), "%s_%s_%s_%s_%s",
+                   OPENPLC_DEVICE_NAME, uid_hex, UDP_SERVER_NAME, OPENPLC_FW_VERSION,
+                   openplc_app_version);
+    reply(reply_msg, ctx);
+  } else if (iap_query_reply(cmd, query_msg, sizeof(query_msg))) {
+    if (query_reply_allowed()) {
+      reply(query_msg, ctx);
+    }
+  } else if (strcmp(cmd, "openplc_server_reboot_challenge") == 0) {
+    char nonce_hex[IAP_AUTH_NONCE_SIZE * 2U + 1U];
+    /* Silence rather than a predictable nonce: without a challenge the caller
+     * cannot authorize a reboot at all, which is the safe end. */
+    if (iap_auth_issue_challenge(nonce_hex)) {
+      reply(nonce_hex, ctx);
+    }
+  } else if (strncmp(cmd, "openplc_server_reboot ", 22) == 0) {
+    // "openplc_server_reboot <cert_hex> <noncesig_hex>" -- cert is the
+    // IAP_CERT_SIZE-byte certificate (iap_cert.h) naming the leaf key that
+    // signed sha256(nonce || "openplc_server_reboot"), nonce_sig is that
+    // 64-byte ECDSA signature, both for the nonce most recently returned by
+    // "openplc_server_reboot_challenge"
+    char cert_hex[(IAP_CERT_SIZE * 2U) + 1U] = {0};
+    char noncesig_hex[129] = {0};
+    /* %256s is IAP_CERT_SIZE*2 written out: a scanf field width cannot be a
+     * macro. Update it by hand with IAP_CERT_SIZE, here and in the
+     * bootloader's IAP_server.c. */
+    if (sscanf(cmd, "openplc_server_reboot %256s %128s", cert_hex, noncesig_hex) == 2) {
+      iap_cert_t cert;
+      uint8_t noncesig_bytes[64];
+      bool decodedOk = hex_decode_local(cert_hex, (uint8_t *)&cert, IAP_CERT_SIZE)
+                     && hex_decode_local(noncesig_hex, noncesig_bytes, 64U);
+
+      if (decodedOk && iap_auth_verify_and_consume((const uint8_t *)"openplc_server_reboot", 21U, &cert, noncesig_bytes)) {
+        /* Even a valid credential must not be able to hold the PLC in a reboot
+         * loop; one accepted reboot per cooldown window is enough for any real
+         * update flow. */
+        uint32_t now = HAL_GetTick();
+        if ((s_last_reboot_tick != 0U) && ((now - s_last_reboot_tick) < REBOOT_COOLDOWN_MS)) {
+          printf("Reboot request ignored: still within cooldown\r\n");
+        } else {
+          s_last_reboot_tick = now;
+          openplc_set_boot_flag_and_reset(channel);
+        }
+      } else {
+        printf("Rejected unauthenticated openplc_server_reboot request\r\n");
+      }
+    }
+  }
+}
+
+typedef struct {
+  struct udp_pcb *pcb;
+  const ip_addr_t *addr;
+  u16_t port;
+} udp_reply_ctx_t;
+
+static void udp_reply_fn(const char *msg, void *ctx)
+{
+  udp_reply_ctx_t *c = (udp_reply_ctx_t *)ctx;
+  openplc_udp_reply(c->pcb, c->addr, c->port, msg);
+}
+
 static void udp_server_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
                             const ip_addr_t *addr, u16_t port)
 {
@@ -314,7 +410,6 @@ static void udp_server_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
 
   /* "openplc_server_reboot <cert_hex> <noncesig_hex>" is ~408 bytes. */
   char recv_buf[512] = {0};
-  char query_msg[IAP_QUERY_REPLY_MAX];
   const uint16_t n = (p->len < sizeof(recv_buf) - 1U) ? p->len : (sizeof(recv_buf) - 1U);
   memcpy(recv_buf, p->payload, n);
   udp_server_recv_counter++;
@@ -322,76 +417,12 @@ static void udp_server_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
   udp_server_last_rx_len_value = n;
   pbuf_free(p);
 
-  if ((strcmp(recv_buf, "DISCOVER") == 0) ||
-      (strcmp(recv_buf, "openplc_discover") == 0) ||
-      (strcmp(recv_buf, "openplc_server_where_r_y") == 0) ||
-      (strcmp(recv_buf, "ping") == 0)) {
-    /* Identity string contract, shared with the bootloader's
-     * iap_identity_string() (OpenPLC_BootLoader/IAPServer/IAP_server.c): the PC
-     * tool splits it on "_", so it is exactly five fields --
-     * name_uid_role_pkgversion_appversion -- and no field may contain an
-     * underscore. The bootloader has nothing to report for the last one and
-     * sends "-" there. The two repositories cannot share the code, so changing
-     * one means changing both; the pair is tracked as a cross-repo mirror in
-     * $PROD/docs/repo/ARCHITECTURE.md. */
-    char uid_hex[IAP_MACHINE_ID_HEX_LEN + 1U] = {0};
-    char reply_msg[96] = {0};
-
-    if (!discovery_reply_allowed()) {
-      return;
-    }
-
-    iap_keyderive_get_machine_id_hex(uid_hex);
-    (void)snprintf(reply_msg, sizeof(reply_msg), "%s_%s_%s_%s_%s",
-                   OPENPLC_DEVICE_NAME, uid_hex, UDP_SERVER_NAME, OPENPLC_FW_VERSION,
-                   openplc_app_version);
-    openplc_udp_reply(pcb, addr, port, reply_msg);
-  } else if ((strncmp(recv_buf, "openplc_log", 11) == 0) &&
-             ((recv_buf[11] == '\0') || (recv_buf[11] == ' '))) {
+  if ((strncmp(recv_buf, "openplc_log", 11) == 0) &&
+      ((recv_buf[11] == '\0') || (recv_buf[11] == ' '))) {
     log_read_reply(pcb, addr, port, (uint32_t)strtoul(&recv_buf[11], NULL, 10));
-  } else if (iap_query_reply(recv_buf, query_msg, sizeof(query_msg))) {
-    if (query_reply_allowed()) {
-      openplc_udp_reply(pcb, addr, port, query_msg);
-    }
-  } else if (strcmp(recv_buf, "openplc_server_reboot_challenge") == 0) {
-    char nonce_hex[IAP_AUTH_NONCE_SIZE * 2U + 1U];
-    /* Silence rather than a predictable nonce: without a challenge the caller
-     * cannot authorize a reboot at all, which is the safe end. */
-    if (iap_auth_issue_challenge(nonce_hex)) {
-      openplc_udp_reply(pcb, addr, port, nonce_hex);
-    }
-  } else if (strncmp(recv_buf, "openplc_server_reboot ", 22) == 0) {
-    // "openplc_server_reboot <cert_hex> <noncesig_hex>" -- cert is the
-    // IAP_CERT_SIZE-byte certificate (iap_cert.h) naming the leaf key that
-    // signed sha256(nonce || "openplc_server_reboot"), nonce_sig is that
-    // 64-byte ECDSA signature, both for the nonce most recently returned by
-    // "openplc_server_reboot_challenge"
-    char cert_hex[(IAP_CERT_SIZE * 2U) + 1U] = {0};
-    char noncesig_hex[129] = {0};
-    /* %256s is IAP_CERT_SIZE*2 written out: a scanf field width cannot be a
-     * macro. Update it by hand with IAP_CERT_SIZE, here and in the
-     * bootloader's IAP_server.c. */
-    if (sscanf(recv_buf, "openplc_server_reboot %256s %128s", cert_hex, noncesig_hex) == 2) {
-      iap_cert_t cert;
-      uint8_t noncesig_bytes[64];
-      bool decodedOk = hex_decode_local(cert_hex, (uint8_t *)&cert, IAP_CERT_SIZE)
-                     && hex_decode_local(noncesig_hex, noncesig_bytes, 64U);
-
-      if (decodedOk && iap_auth_verify_and_consume((const uint8_t *)"openplc_server_reboot", 21U, &cert, noncesig_bytes)) {
-        /* Even a valid credential must not be able to hold the PLC in a reboot
-         * loop; one accepted reboot per cooldown window is enough for any real
-         * update flow. */
-        uint32_t now = HAL_GetTick();
-        if ((s_last_reboot_tick != 0U) && ((now - s_last_reboot_tick) < REBOOT_COOLDOWN_MS)) {
-          printf("Reboot request ignored: still within cooldown\r\n");
-        } else {
-          s_last_reboot_tick = now;
-          openplc_set_eth_flag_and_reset();
-        }
-      } else {
-        printf("Rejected unauthenticated openplc_server_reboot request\r\n");
-      }
-    }
+  } else {
+    udp_reply_ctx_t ctx = {pcb, addr, port};
+    iap_dispatch(recv_buf, udp_reply_fn, &ctx, BOOT_REQ_ETH);
   }
 }
 
@@ -429,3 +460,63 @@ uint16_t openplc_udp_server_last_rx_len(void)
 {
   return udp_server_last_rx_len_value;
 }
+
+#if defined(USBCON) && defined(USBD_USE_CDC)
+/* USB IAP mode (decision 176): while the host holds the port at 1200 baud,
+ * lines go to iap_dispatch() instead of the sketch's Serial. Format and exit
+ * rules: $PROD/docs/modules/M1/IAP-PROTOCOL.md "USB 上的 IAP 模式". */
+#define CDC_IAP_LINE_MAX     512U
+#define CDC_IAP_IDLE_MS      10000U
+
+static void cdc_reply_fn(const char *msg, void *ctx)
+{
+  (void)ctx;
+  CDC_iap_write((const uint8_t *)msg, (uint32_t)strlen(msg));
+  CDC_iap_write((const uint8_t *)"\n", 1U);
+}
+
+void openplc_cdc_iap_service(void)
+{
+  static char line[CDC_IAP_LINE_MAX];
+  static uint16_t used;
+  static bool overflow;
+  static uint32_t seen_entries;
+  static uint32_t last_cmd_tick;
+  int ch;
+
+  if (!CDC_iap_mode()) {
+    return;
+  }
+  if (CDC_iap_mode_entries() != seen_entries) {
+    seen_entries = CDC_iap_mode_entries();
+    used = 0U;
+    overflow = false;
+    last_cmd_tick = HAL_GetTick();
+  }
+
+  while ((ch = CDC_iap_read()) >= 0) {
+    if ((ch == '\n') || (ch == '\r')) {
+      if (!overflow && (used > 0U)) {
+        line[used] = '\0';
+        last_cmd_tick = HAL_GetTick();
+        openplc_identify_blink_request();
+        iap_dispatch(line, cdc_reply_fn, NULL, BOOT_REQ_CDC);
+      }
+      used = 0U;
+      overflow = false;
+    } else if (used < (CDC_IAP_LINE_MAX - 1U)) {
+      line[used++] = (char)ch;
+    } else {
+      overflow = true;
+    }
+  }
+
+  if ((HAL_GetTick() - last_cmd_tick) >= CDC_IAP_IDLE_MS) {
+    CDC_iap_mode_exit();
+  }
+}
+#else
+void openplc_cdc_iap_service(void)
+{
+}
+#endif

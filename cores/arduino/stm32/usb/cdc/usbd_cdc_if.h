@@ -54,6 +54,11 @@ void CDC_init(void);
 void CDC_deInit(void);
 bool CDC_connected(void);
 void CDC_enableDTR(bool enable);
+bool CDC_iap_mode(void);
+void CDC_iap_mode_exit(void);
+uint32_t CDC_iap_mode_entries(void);
+int CDC_iap_read(void);
+void CDC_iap_write(const uint8_t *buffer, uint32_t size);
 
 #ifdef __cplusplus
 }

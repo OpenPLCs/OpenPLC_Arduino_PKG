@@ -80,6 +80,8 @@ size_t SystemLogPrint::write(uint8_t c)
 }
 
 #if defined(USBCON) && defined(USBD_USE_CDC)
+#define OPEN_SETTLE_MS  200U
+
 struct send_ctx {
   uint32_t next;   // first record not yet out; 0 = none sent
   bool stalled;
@@ -90,11 +92,14 @@ static void send_line(const char *line, size_t len, uint32_t seq, void *ctx)
   send_ctx *s = (send_ctx *)ctx;
   size_t n;
 
-  if (s->stalled) {
+  // IAP mode can start mid-pass; Serial then drops what it is given, so the
+  // line stays unsent (decision 176).
+  if (s->stalled || CDC_iap_mode()) {
+    s->stalled = true;
     return;
   }
   n = SerialUSB.write((const uint8_t *)line, len);
-  if (n == 0U) {
+  if ((n == 0U) || CDC_iap_mode()) {
     s->stalled = true;
     return;
   }
@@ -225,9 +230,20 @@ extern "C" void openplc_syslog_service(void)
   identify_blink();
 #if defined(USBCON) && defined(USBD_USE_CDC)
   send_ctx s = {0U, false};
-
+  static bool s_was_up;
+  static uint32_t s_up_at;
+  const uint32_t now = HAL_GetTick();
   // CDC_connected(): configured, DTR set, and the host is still reading.
-  if (log_on() && CDC_connected()) {
+  const bool up = CDC_connected();
+
+  if (up && !s_was_up) {
+    s_up_at = now;
+  }
+  s_was_up = up;
+  // Held back in IAP mode, sent after it (decision 176); held back for
+  // OPEN_SETTLE_MS after the port opens, as some hosts clear their receive
+  // buffer after raising DTR ($PROD/docs/modules/M1/BOOT-LOG.md).
+  if (log_on() && up && !CDC_iap_mode() && ((now - s_up_at) >= OPEN_SETTLE_MS)) {
     (void)boot_log_read_unsent(send_line, &s);
     boot_log_mark_sent(s.next);
   }

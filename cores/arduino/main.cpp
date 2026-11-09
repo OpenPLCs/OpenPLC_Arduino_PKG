@@ -124,6 +124,7 @@ extern "C" void yield(void)
   if (s_net_started) {
     openplc_net_process();
   }
+  openplc_cdc_iap_service();
 #endif
   openplc_syslog_service();
   busy = false;
@@ -152,6 +153,7 @@ int main(void)
 
 #ifdef OPENPLC_UDP_SERVER_AUTOSTART
     openplc_net_process();
+    openplc_cdc_iap_service();
     openplc_diag_tick();
 #endif
 

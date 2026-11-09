@@ -54,7 +54,9 @@ extern "C" {
 #define CDC_QUEUE_MAX_PACKET_SIZE USB_FS_MAX_PACKET_SIZE
 #endif
 #define CDC_TRANSMIT_QUEUE_BUFFER_SIZE ((uint16_t)(CDC_QUEUE_MAX_PACKET_SIZE * 2))
-#define CDC_RECEIVE_QUEUE_BUFFER_SIZE ((uint16_t)(CDC_QUEUE_MAX_PACKET_SIZE * 3))
+/* Holds one whole IAP-mode command (up to 511 bytes) while loop() is busy:
+ * once the queue is full the next OUT packet is lost. Decision 176. */
+#define CDC_RECEIVE_QUEUE_BUFFER_SIZE ((uint16_t)(CDC_QUEUE_MAX_PACKET_SIZE * 10))
 
 typedef struct {
   uint8_t buffer[CDC_TRANSMIT_QUEUE_BUFFER_SIZE];

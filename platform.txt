@@ -186,6 +186,9 @@ tools.ethtransfer.upload.pattern="{path}/{cmd}" "ether" "{build.path}/{build.pro
 pluggable_discovery.network_discovery.pattern.windows="{runtime.platform.path}/tools/discovery/bin/windows_amd64/network_discovery.exe"
 pluggable_discovery.network_discovery.pattern.linux="{runtime.platform.path}/tools/discovery/bin/linux_amd64/network_discovery"
 pluggable_discovery.network_discovery.pattern.macosx="{runtime.platform.path}/tools/discovery/macos-launcher.sh"
+# The IDE stops supplying its serial monitor once a platform declares a
+# discovery, so name it here or COM ports do not open in the IDE.
+pluggable_monitor.required.serial=builtin:serial-monitor
 
 # Debugger configuration (general options)
 # ----------------------------------------

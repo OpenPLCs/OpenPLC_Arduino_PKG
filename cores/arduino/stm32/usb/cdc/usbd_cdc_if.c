@@ -24,7 +24,6 @@
 #include "usbd_desc.h"
 #include "usbd_cdc_if.h"
 #include "bootloader.h"
-#include "IAP_boot_handoff.h"
 
 #ifdef USE_USB_HS
   #define CDC_MAX_PACKET_SIZE USB_OTG_HS_MAX_PACKET_SIZE
@@ -54,6 +53,15 @@ static bool CDC_DTR_enabled = true;
 CDC_TransmitQueue_TypeDef TransmitQueue;
 CDC_ReceiveQueue_TypeDef ReceiveQueue;
 __IO bool dtrState = false; /* lineState */
+
+/* IAP mode: 1200 baud hands this port to the IAP service instead of the
+ * sketch's Serial (decision 176, $PROD/docs/modules/M1/IAP-PROTOCOL.md
+ * "USB 上的 IAP 模式"). iapEntries counts entries so the service can tell a
+ * fresh entry from a continuing one; iapSkip is how many bytes were already
+ * queued for Serial at entry, which the service discards. */
+static volatile bool iapMode = false;
+static volatile uint32_t iapEntries = 0;
+static volatile uint32_t iapSkip = 0;
 __IO bool rtsState = false;
 __IO bool receivePended = true;
 static uint32_t transmitStart = 0;
@@ -173,17 +181,16 @@ static int8_t USBD_CDC_Control(uint8_t cmd, uint8_t *pbuf, uint16_t length)
       linecoding.format     = pbuf[4];
       linecoding.paritytype = pbuf[5];
       linecoding.datatype   = pbuf[6];
-    /* Opening the port at 1200 baud is the PC tool's "reboot into the
-     * bootloader" signal. This used to write an RTC backup register straight
-     * from here, which only worked while PWR_CR1.DBP happened to be set -- and
-     * the IAP nonce counter clears it, so a CDC upload attempted after any
-     * ethernet challenge silently lost the flag and rebooted back into the
-     * sketch. boot_handoff_request() has no such precondition, verifies the
-     * record landed, and only then resets; if it returns at all the request was
-     * not stored and resetting would just repeat the silent failure. */
-    if (linecoding.bitrate == MAGIC_CDC_RATE)
-    {
-      (void)boot_handoff_request(BOOT_REQ_CDC);
+    /* 1200 baud enters IAP mode, any other rate leaves it; no reset here, the
+     * reboot is an authenticated IAP command (decision 176). */
+    if (linecoding.bitrate == MAGIC_CDC_RATE) {
+      if (!iapMode) {
+        iapSkip = (uint32_t)CDC_ReceiveQueue_ReadSize(&ReceiveQueue);
+        iapEntries++;
+        iapMode = true;
+      }
+    } else {
+      iapMode = false;
     }
       break;
 
@@ -199,7 +206,13 @@ static int8_t USBD_CDC_Control(uint8_t cmd, uint8_t *pbuf, uint16_t length)
 
     case CDC_SET_CONTROL_LINE_STATE:
       // Check DTR state
-      dtrState = (CDC_DTR_enabled) ? (((USBD_SetupReqTypedef *)pbuf)->wValue & CLS_DTR) : true;
+      {
+        bool wasDtr = dtrState;
+        dtrState = (CDC_DTR_enabled) ? (((USBD_SetupReqTypedef *)pbuf)->wValue & CLS_DTR) : true;
+        if (wasDtr && !dtrState) { // The host closed the port: IAP mode ends with it
+          iapMode = false;
+        }
+      }
 
       if (dtrState) { // Reset the transmit timeout when the port is connected
         transmitStart = 0;
@@ -370,6 +383,63 @@ bool CDC_resume_receive(void)
 void CDC_enableDTR(bool enable)
 {
   CDC_DTR_enabled = enable;
+}
+
+bool CDC_iap_mode(void)
+{
+  return iapMode;
+}
+
+void CDC_iap_mode_exit(void)
+{
+  iapMode = false;
+}
+
+uint32_t CDC_iap_mode_entries(void)
+{
+  return iapEntries;
+}
+
+/* Main thread only, like USBSerial::read(). -1 when nothing is queued. */
+int CDC_iap_read(void)
+{
+  int ch;
+
+  for (;;) {
+    ch = CDC_ReceiveQueue_Dequeue(&ReceiveQueue);
+    CDC_resume_receive();
+    if ((ch < 0) || (iapSkip == 0U)) {
+      return ch;
+    }
+    iapSkip--;
+  }
+}
+
+/* Bypasses USBSerial::write(), which drops everything in IAP mode, and does
+ * not wait for DTR: an IAP reply goes out whether or not the host raised it.
+ * Replies can be longer than the queue (getpubkey), so they go in pieces; if
+ * the host stops reading for CDC_IAP_WRITE_WAIT_MS the rest is dropped. */
+#define CDC_IAP_WRITE_WAIT_MS 50U
+
+void CDC_iap_write(const uint8_t *buffer, uint32_t size)
+{
+  uint32_t waited_from = HAL_GetTick();
+
+  while ((size > 0U) && (hUSBD_Device_CDC.dev_state == USBD_STATE_CONFIGURED)) {
+    uint32_t room = (uint32_t)CDC_TransmitQueue_WriteSize(&TransmitQueue);
+    if (room > size) {
+      room = size;
+    }
+    if (room > 0U) {
+      CDC_TransmitQueue_Enqueue(&TransmitQueue, buffer, room);
+      CDC_continue_transmit();
+      buffer += room;
+      size -= room;
+      waited_from = HAL_GetTick();
+    } else if ((HAL_GetTick() - waited_from) >= CDC_IAP_WRITE_WAIT_MS) {
+      return;
+    }
+  }
 }
 
 #endif /* USBD_USE_CDC */

@@ -66,6 +66,10 @@ size_t USBSerial::write(uint8_t ch)
 
 size_t USBSerial::write(const uint8_t *buffer, size_t size)
 {
+  // IAP mode owns the port: the sketch's output is dropped (decision 176)
+  if (CDC_iap_mode()) {
+    return size;
+  }
   size_t rest = size;
   while (rest > 0 && CDC_connected()) {
     // Determine buffer size available for write
@@ -91,12 +95,18 @@ size_t USBSerial::write(const uint8_t *buffer, size_t size)
 
 int USBSerial::available(void)
 {
-  // Just ReceiveQueue size, available for reading
+  // Just ReceiveQueue size, available for reading; in IAP mode the bytes are the IAP service's
+  if (CDC_iap_mode()) {
+    return 0;
+  }
   return static_cast<int>(CDC_ReceiveQueue_ReadSize(&ReceiveQueue));
 }
 
 int USBSerial::read(void)
 {
+  if (CDC_iap_mode()) {
+    return -1;
+  }
   // Dequeue only one char from queue
   // TS: it safe, because only main thread affects ReceiveQueue->read pos
   auto ch = CDC_ReceiveQueue_Dequeue(&ReceiveQueue);
@@ -111,6 +121,9 @@ size_t USBSerial::readBytes(char *buffer, size_t length)
   auto rest = static_cast<uint16_t>(length);
   _startMillis = millis();
   do {
+    if (CDC_iap_mode()) { // IAP mode can start mid-wait; its bytes are not the sketch's
+      break;
+    }
     read = CDC_ReceiveQueue_Read(&ReceiveQueue, reinterpret_cast<uint8_t *>(buffer), rest);
     CDC_resume_receive();
     rest -= read;
@@ -128,6 +141,9 @@ size_t USBSerial::readBytesUntil(char terminator, char *buffer, size_t length)
   auto rest = static_cast<uint16_t>(length);
   _startMillis = millis();
   do {
+    if (CDC_iap_mode()) { // IAP mode can start mid-wait; its bytes are not the sketch's
+      break;
+    }
     bool found = CDC_ReceiveQueue_ReadUntil(&ReceiveQueue, static_cast<uint8_t>(terminator),
                                             reinterpret_cast<uint8_t *>(buffer), rest, &read);
     CDC_resume_receive();
@@ -145,6 +161,9 @@ size_t USBSerial::readBytesUntil(char terminator, char *buffer, size_t length)
 
 int USBSerial::peek(void)
 {
+  if (CDC_iap_mode()) {
+    return -1;
+  }
   // Peek one symbol, it can't change receive avaiablity
   return CDC_ReceiveQueue_Peek(&ReceiveQueue);
 }

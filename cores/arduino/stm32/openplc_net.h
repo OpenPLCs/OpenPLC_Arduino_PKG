@@ -23,6 +23,7 @@ void openplc_udp_server_start(void);
 uint32_t openplc_udp_server_recv_count(void);
 uint32_t openplc_udp_server_last_rx_tick(void);
 uint16_t openplc_udp_server_last_rx_len(void);
+void openplc_cdc_iap_service(void);
 
 #ifdef __cplusplus
 }
