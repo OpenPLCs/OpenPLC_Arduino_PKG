@@ -1,0 +1,12 @@
+{
+  "name": "openplc-identify",
+  "displayName": "OpenPLC board identify",
+  "description": "Blinks LED3 on the OpenPLC board selected in the port list.",
+  "publisher": "openplc",
+  "version": "1.0.0",
+  "license": "BSD-3-Clause",
+  "engines": { "vscode": "^1.60.0" },
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "extensionDependencies": ["dankeboy36.vscode-arduino-api"]
+}
