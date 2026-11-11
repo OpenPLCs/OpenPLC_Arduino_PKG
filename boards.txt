@@ -20,7 +20,7 @@ OPEN-PLC.build.board= GenH7
 # OPENPLC_FW_VERSION, the third field of the identity string a board answers
 # discovery with. It says which release built the firmware; it is not a version
 # for the sketch, and nothing compares it. Keep it dotted, each field 0-255.
-OPEN-PLC.build.fw_version=0.1.3
+OPEN-PLC.build.fw_version=0.2.0
 # HAL_RNG_MODULE_ENABLED: the challenge nonce comes from the RNG peripheral
 # (libraries/OpenPLC_IAP/src/iap_auth.c, decision 66). RNG is not in the opt-in
 # list in cores/arduino/stm32/stm32yyxx_hal_conf.h, so it has to be defined here.
@@ -71,11 +71,14 @@ OPEN-PLC.menu.forceflash.yes=Yes
 OPEN-PLC.menu.forceflash.yes.upload.force_flag=--force
 
 OPEN-PLC.menu.upload_method.cdcMethod=CDC Transfer
+# Must exist, even empty: without it arduino-cli refuses to upload unless a programmer is chosen (arduino-cli commands/service_upload.go, ProgrammerRequiredForUploadError).
+OPEN-PLC.menu.upload_method.cdcMethod.upload.protocol=
 OPEN-PLC.menu.upload_method.cdcMethod.upload.tool=cdctransfer
 OPEN-PLC.menu.upload_method.cdcMethod.upload.tool.serial=cdctransfer
 OPEN-PLC.menu.upload_method.cdcMethod.upload.tool.network=cdctransfer
 
 OPEN-PLC.menu.upload_method.ethMethod=ETH Transfer
+OPEN-PLC.menu.upload_method.ethMethod.upload.protocol=
 OPEN-PLC.menu.upload_method.ethMethod.upload.tool=ethtransfer
 OPEN-PLC.menu.upload_method.ethMethod.upload.tool.serial=ethtransfer
 OPEN-PLC.menu.upload_method.ethMethod.upload.tool.network=ethtransfer
