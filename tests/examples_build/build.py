@@ -5,8 +5,7 @@
 
 Examples are the first thing a new user compiles and the last thing anybody
 re-checks; they rot silently when an API is renamed. Scope: the project's own
-libraries and the upstream STM32duino ones (decision 68); upstream examples
-never meant for an H743 are in EXCLUDED with their reason. Compiles the
+libraries; upstream libraries ship without examples (decision 181). Compiles the
 installed board package ($CORE_LIVE), which P3 holds identical to this repo.
 
 Exit 0 = every example compiled, 1 = at least one did not, 2 = prerequisites missing.
@@ -23,11 +22,8 @@ sys.path.insert(0, str(HERE.parent))
 
 from _common import FQBN, Fail, Ok, Section, Warn, compile_argv, need_cli_and_core, run_capture, scratch  # noqa: E402
 
-# Compiled first, so a break in the project's own code shows up early.
-OWN_LIBRARIES = ("OpenPLC_Ports", "OpenPLC_SDRAM", "OpenPLC_IAP", "OpenPLC_Net", "OpenPLC_KNX")
-
-# (library, example) -> why it cannot build for this board.
-EXCLUDED = {}
+# The project's own libraries; the upstream ones ship without examples (decision 181).
+OWN_PREFIX = "OpenPLC_"
 
 SKIP_DIRS = {"__pycache__", ".vscode", "build"}
 
@@ -47,10 +43,9 @@ def main():
 
     cli, core = need_cli_and_core()
     libs_dir = core / "libraries"
-    upstream = sorted(d.name for d in libs_dir.iterdir() if d.is_dir() and d.name not in OWN_LIBRARIES)
 
     sketches = []
-    for lib in OWN_LIBRARIES + tuple(upstream):
+    for lib in sorted(d.name for d in libs_dir.iterdir() if d.is_dir() and d.name.startswith(OWN_PREFIX)):
         if args.only and args.only.lower() not in lib.lower():
             continue
         examples = libs_dir / lib / "examples"
@@ -59,9 +54,6 @@ def main():
         # An Arduino example is a directory holding a .ino of the same name.
         for d in walk_dirs(examples):
             if not (d / (d.name + ".ino")).exists():
-                continue
-            if (lib, d.name) in EXCLUDED:
-                print("  skip %s / %s: %s" % (lib, d.name, EXCLUDED[(lib, d.name)]))
                 continue
             sketches.append((lib, d.name, d))
 

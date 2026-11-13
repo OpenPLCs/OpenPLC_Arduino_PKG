@@ -1,7 +1,6 @@
 # Menus and why the others were removed: $PROD/docs/build/BUILD-AND-TEST.md
 menu.pnum=Board part number
 menu.usb=USB support
-menu.upload_method=Upload method
 menu.forceflash=Force flash (allow older version)
 
 ################################################################################
@@ -70,17 +69,10 @@ OPEN-PLC.menu.forceflash.no.upload.force_flag=
 OPEN-PLC.menu.forceflash.yes=Yes
 OPEN-PLC.menu.forceflash.yes.upload.force_flag=--force
 
-OPEN-PLC.menu.upload_method.cdcMethod=CDC Transfer
+# The picked port decides the transfer: a USB serial port goes over CDC, a network port over Ethernet (decision 180).
 # Must exist, even empty: without it arduino-cli refuses to upload unless a programmer is chosen (arduino-cli commands/service_upload.go, ProgrammerRequiredForUploadError).
-OPEN-PLC.menu.upload_method.cdcMethod.upload.protocol=
-OPEN-PLC.menu.upload_method.cdcMethod.upload.tool=cdctransfer
-OPEN-PLC.menu.upload_method.cdcMethod.upload.tool.serial=cdctransfer
-OPEN-PLC.menu.upload_method.cdcMethod.upload.tool.network=cdctransfer
-
-OPEN-PLC.menu.upload_method.ethMethod=ETH Transfer
-OPEN-PLC.menu.upload_method.ethMethod.upload.protocol=
-OPEN-PLC.menu.upload_method.ethMethod.upload.tool=ethtransfer
-OPEN-PLC.menu.upload_method.ethMethod.upload.tool.serial=ethtransfer
-OPEN-PLC.menu.upload_method.ethMethod.upload.tool.network=ethtransfer
+OPEN-PLC.upload.protocol=
+OPEN-PLC.upload.tool.serial=cdctransfer
+OPEN-PLC.upload.tool.network=ethtransfer
 
 ################################################################################
