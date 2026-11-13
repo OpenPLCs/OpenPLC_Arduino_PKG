@@ -32,8 +32,8 @@ extern const uint8_t openplc_system_log_on;
  * Safe from interrupt and fault context; there it only reaches the buffer. */
 void openplc_syslog_write(const char *tag, const char *text, size_t len);
 
-/* stdout / stderr bytes from _write(): collected into lines, untagged lines
- * get BOOT_LOG_TAG_NET (every core and library printf today is network code). */
+/* stdout / stderr bytes from _write(): collected into lines, each prefixed
+ * "[sys] ". */
 void openplc_syslog_stdout(const char *ptr, size_t len);
 
 /* Sends records not yet sent to USB port 1 while DTR is set, then marks them
