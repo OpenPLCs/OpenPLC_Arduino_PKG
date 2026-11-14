@@ -263,10 +263,11 @@ static int8_t USBD_CDC_Receive(uint8_t *Buf, uint32_t *Len)
   /* It always contains required amount of free space for writing */
   CDC_ReceiveQueue_CommitBlock(&ReceiveQueue, (uint16_t)(*Len));
   receivePended = false;
-  /* If enough space in the queue for a full buffer then continue receive */
-  if (!CDC_resume_receive()) {
-    USBD_CDC_ClearBuffer(&hUSBD_Device_CDC);
-  }
+  /* A full queue leaves the endpoint NAKing until a read makes room and
+   * CDC_resume_receive() re-arms it: the host waits, nothing is lost.
+   * USBD_CDC_ClearBuffer() here would accept the next packet into address 0
+   * and commit it unreserved ($PROD/docs/modules/M3-app-runtime.md R3-23). */
+  (void)CDC_resume_receive();
   return ((int8_t)USBD_OK);
 }
 
