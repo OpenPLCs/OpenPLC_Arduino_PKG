@@ -1905,6 +1905,15 @@ static const char *sd_fs_from_sector(const uint8_t *s)
     return "unknown";
 }
 
+static uint32_t sd_le32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+/* Not a boot sector itself: follow the first partition. 0xEE is a GPT disk's
+ * protective entry; GPT's first partition is found through its header (LBA 1,
+ * entry array LBA at offset 72) and first entry (start LBA at offset 32), as
+ * the fixture firmware does ($BOOT TestCase/SD/sd_test.c sd_read_fs_type). */
 static const char *sd_fs_type(void)
 {
     const char *kind;
@@ -1913,8 +1922,13 @@ static const char *sd_fs_type(void)
     if (!fx_sd_read_block(0U, sd_buf)) { return "none"; }
     kind = sd_fs_from_sector(sd_buf);
     if (strcmp(kind, "unknown") != 0 || sd_buf[0x1C2] == 0U) { return kind; }
-    lba = (uint32_t)sd_buf[0x1C6] | ((uint32_t)sd_buf[0x1C7] << 8) |
-          ((uint32_t)sd_buf[0x1C8] << 16) | ((uint32_t)sd_buf[0x1C9] << 24);
+    if (sd_buf[0x1C2] == 0xEEU) {
+        if (!fx_sd_read_block(1U, sd_buf) || memcmp(sd_buf, "EFI PART", 8) != 0) { return "unknown"; }
+        if (!fx_sd_read_block(sd_le32(&sd_buf[72]), sd_buf)) { return "unknown"; }
+        lba = sd_le32(&sd_buf[32]);
+    } else {
+        lba = sd_le32(&sd_buf[0x1C6]);
+    }
     if (lba == 0U || !fx_sd_read_block(lba, sd_buf)) { return "unknown"; }
     return sd_fs_from_sector(sd_buf);
 }
@@ -2192,6 +2206,135 @@ static void run_sdram_sweep(const char *args, char *out, size_t len)
              (unsigned long)write_ms, (unsigned long)verify_ms);
 }
 
+/* sdram -- the retention session, as the fixture firmware's porttool_sdram.c:
+ * random words written, left wait= ms, read back, round after round. Through
+ * OpenPLC_SDRAM, which sets the SDRAM refresh itself (decision 184). */
+
+#define SDRAM_WAIT_MIN_MS 1000U   /* below a second a board with no refresh would still pass */
+#define SDRAM_HOLD_WORDS  64U
+
+enum { SDRAM_WRITE, SDRAM_WAIT, SDRAM_VERIFY };
+
+static uint32_t sdram_wait = 5000U, sdram_period = 1000U, sdram_due, sdram_until;
+static uint32_t sdram_rng, sdram_seed, sdram_cycles, sdram_checked, sdram_failed, sdram_first_bad;
+static uint32_t sdram_word[SDRAM_HOLD_WORDS];
+static int sdram_phase, sdram_ready;
+static echo_t sdram_echo;
+
+static uint32_t sdram_rand(void)
+{
+    uint32_t x = sdram_rng;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    sdram_rng = x;
+    return x;
+}
+
+/* What each word holds: its board address, so a word landing elsewhere shows. */
+static uint32_t sdram_signature(uint32_t word) { return (SDRAM_BASE + word * 4U) ^ 0xDEADBEEFUL; }
+
+static int sdram_apply(const char *args, char *err, size_t err_len)
+{
+    char probe[32];
+    uint32_t v, wait = sdram_wait, period = sdram_period;
+
+    if (get_str(args, "wait", probe, sizeof(probe))) {
+        if (!parse_u32(probe, &v)) {
+            snprintf(err, err_len, "wait=\"%s\" is not a number", probe);
+            return 0;
+        }
+        /* Refused rather than clamped: the plan should learn its wait is wrong. */
+        if (v < SDRAM_WAIT_MIN_MS) {
+            snprintf(err, err_len,
+                     "wait=%lu is below %lu ms - cells hold for tens of "
+                     "milliseconds unrefreshed, so a shorter wait passes on a "
+                     "board whose refresh never started",
+                     (unsigned long)v, (unsigned long)SDRAM_WAIT_MIN_MS);
+            return 0;
+        }
+        wait = v;
+    }
+    if (!apply_period(args, &period, err, err_len)) { return 0; }
+    sdram_wait = wait;
+    sdram_period = period;
+    return 1;
+}
+
+static int sdram_start(const char *args, char *err, size_t err_len)
+{
+    if (!sdram_apply(args, err, err_len)) { return 0; }
+    if (fx_sdram() == NULL) {
+        snprintf(err, err_len, "the FMC controller is not brought up, so nothing written "
+                 "would mean anything");
+        return 0;
+    }
+    if (sdram_rng == 0U) {
+        sdram_rng = fx_millis() | 1U;   /* xorshift needs a non-zero seed */
+    }
+    sdram_ready = 1;
+    sdram_cycles = sdram_checked = sdram_failed = sdram_first_bad = sdram_seed = 0U;
+    echo_reset(&sdram_echo);
+    sdram_phase = SDRAM_WRITE;
+    sdram_due = fx_millis();
+    return 1;
+}
+
+static void sdram_stop(void) { sdram_ready = 0; }
+
+static void sdram_tick(uint32_t now)
+{
+    static const char *const phase_name[] = { "write", "wait", "verify" };
+    volatile uint32_t *mem = fx_sdram();
+    char body[BODY_MAX];
+
+    /* Every pass, so the round's timing does not follow the frame rate. */
+    if (sdram_phase == SDRAM_WRITE) {
+        sdram_seed = sdram_rng;
+        sdram_checked = SDRAM_HOLD_WORDS;
+        for (uint32_t i = 0; i < SDRAM_HOLD_WORDS; i++) {
+            sdram_word[i] = sdram_rand() % (SDRAM_BYTES / 4U);
+            mem[sdram_word[i]] = sdram_signature(sdram_word[i]);
+        }
+        sdram_until = now + sdram_wait;
+        sdram_phase = SDRAM_WAIT;
+    } else if (sdram_phase == SDRAM_WAIT) {
+        if ((int32_t)(now - sdram_until) >= 0) { sdram_phase = SDRAM_VERIFY; }
+    } else {
+        for (uint32_t i = 0; i < SDRAM_HOLD_WORDS; i++) {
+            if (mem[sdram_word[i]] != sdram_signature(sdram_word[i])) {
+                if (sdram_first_bad == 0U) { sdram_first_bad = SDRAM_BASE + sdram_word[i] * 4U; }
+                sdram_failed++;   /* summed over the whole run, so one bad round stays visible */
+            }
+        }
+        sdram_cycles++;
+        sdram_phase = SDRAM_WRITE;
+    }
+
+    if (!due(now, &sdram_due, sdram_period)) { return; }
+    echo_tick(&sdram_echo);
+    echo_fields(&sdram_echo, body, sizeof(body));
+    add(body, sizeof(body), " ready=%u phase=%s cycles=%lu checked=%lu failed=%lu"
+        " first_bad=0x%08lX wait_ms=%lu seed=0x%08lX", (unsigned)sdram_ready,
+        phase_name[sdram_phase], (unsigned long)sdram_cycles, (unsigned long)sdram_checked,
+        (unsigned long)sdram_failed, (unsigned long)sdram_first_bad, (unsigned long)sdram_wait,
+        (unsigned long)sdram_seed);
+    frame("sdram", now, body);
+}
+
+static void sdram_echo_got(uint32_t v) { echo_got(&sdram_echo, v); }
+
+static void sdram_caps(char *out, size_t len)
+{
+    snprintf(out, len, "wait=%lu period=%lu", (unsigned long)sdram_wait, (unsigned long)sdram_period);
+}
+
+static void sdram_limits(char *out, size_t len)
+{
+    snprintf(out, len, "wait:%lu.. period:%lu..", (unsigned long)SDRAM_WAIT_MIN_MS,
+             (unsigned long)FX_PERIOD_MIN_MS);
+}
+
 struct run_t {
     const char *name, *port;
     void (*body)(const char *args, char *out, size_t len);
@@ -2256,7 +2399,8 @@ static port_t ports[] = {
     { "usb",   "bridge", "-", "J2", NULL, "mode,period", "link", 1U,
       usb_start, usb_set, usb_stop, usb_tick, NULL, usb_caps, usb_limits, 0 },
     { "sd",    "bridge", "-", "J6", NULL, "period", "ctrl", 1U,
-      sd_start, sd_apply, sd_stop, sd_tick, sd_echo_got, sd_caps, sd_limits, 0 },
+      sd_start, sd_apply, sd_stop, sd_tick, sd_echo_got, sd_caps, sd_limits, 0 },    { "sdram", "bridge", "-", "U6", NULL, "wait,period", "ctrl", 1U,
+      sdram_start, sdram_apply, sdram_stop, sdram_tick, sdram_echo_got, sdram_caps, sdram_limits, 0 },
 };
 #define PORT_COUNT (sizeof(ports) / sizeof(ports[0]))
 
@@ -2282,20 +2426,16 @@ static void stop_all(void)
 
 /* ---- commands ------------------------------------------------------------ */
 
-/* Hardware with pt.run targets and no session: sdram. */
-static const char *const run_only[] = { "sdram" };
-#define RUN_ONLY_COUNT (sizeof(run_only) / sizeof(run_only[0]))
-
 static void reply_caps(void)
 {
     char buf[FX_REPLY_MAX], targets[96];
-    uint32_t lines = RUN_ONLY_COUNT;
+    uint32_t lines = 0U;
 
     for (size_t i = 0; i < PORT_COUNT; i++) {
         lines += 3U + (ports[i].terms != NULL ? 1U : 0U);   /* port=, vals=, limits=, terms= */
     }
     say("OK porttool=%s ports=%lu lines=%lu hold=1 led=1 demo=%s", FX_PROTOCOL_VERSION,
-        (unsigned long)(PORT_COUNT + RUN_ONLY_COUNT), (unsigned long)lines, FX_DEMO_VERSION);
+        (unsigned long)PORT_COUNT, (unsigned long)lines, FX_DEMO_VERSION);
     for (size_t i = 0; i < PORT_COUNT; i++) {
         const port_t *p = &ports[i];
         snprintf(buf, sizeof(buf), "OK port=%s board=%s kind=session blk=%s term=%s channels=%lu"
@@ -2312,11 +2452,6 @@ static void reply_caps(void)
         }
         p->limits(buf, sizeof(buf));
         say("OK limits=%s %s", p->name, buf);
-    }
-    for (size_t i = 0; i < RUN_ONLY_COUNT; i++) {
-        (void)runs_for(run_only[i], targets, sizeof(targets));
-        say("OK port=%s board=bridge kind=run blk=- term=U6 channels=1 loop=none runs=%s",
-            run_only[i], targets);
     }
 }
 
