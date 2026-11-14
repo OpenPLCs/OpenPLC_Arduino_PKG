@@ -4,7 +4,9 @@
  *   sd_lib_test <scenario>
  *
  * SD.begin() here formats and mounts the RAM disk; on the board it is
- * openplc_sd_mount.cpp, which this test replaces.
+ * openplc_sd_mount.cpp, which this test replaces. Built twice: an MBR disk
+ * with FAT32, and (SD_TEST_MIN_GPT) a GPT disk with exFAT, the two layouts
+ * R3-14 names ($PROD/docs/modules/M3-app-runtime.md).
  */
 #include "OpenPLC_SD.h"
 #include "ff_gen_drv.h"
@@ -24,9 +26,15 @@ static void check(bool ok, const char *what)
 
 int digitalRead(uint32_t) { return LOW; }
 
-/* --- a 4 MiB RAM disk ------------------------------------------------------ */
+/* --- a 40 MiB RAM disk: FAT32 needs 65525 clusters ------------------------- */
 
-static const unsigned SECTORS = 8192;
+#ifdef SD_TEST_MIN_GPT
+static const BYTE FORMAT = FM_EXFAT;
+#else
+static const BYTE FORMAT = FM_FAT32;
+#endif
+
+static const unsigned SECTORS = 81920;
 static BYTE disk[SECTORS * 512];
 
 static DSTATUS ram_init(BYTE) { return 0; }
@@ -64,7 +72,7 @@ bool SDClass::begin()
     static bool formatted;
     if (!formatted) {
         static BYTE work[FF_MAX_SS];
-        MKFS_PARM opt = { FM_ANY, 0, 0, 0, 0 };
+        MKFS_PARM opt = { FORMAT, 0, 0, 0, 0 };
         if (FATFS_LinkDriver(&RAM_Driver, drive) != 0 || f_mkfs(drive, &opt, work, sizeof(work)) != FR_OK) {
             return false;
         }
@@ -180,6 +188,19 @@ static void t_root()
     check(found, "the root directory lists its files");
 }
 
+/* The disk is the layout this build is for, not whatever f_mkfs picked. */
+static void t_layout()
+{
+    bool gpt = disk[0x1C2] == 0xEE && memcmp(&disk[512], "EFI PART", 8) == 0;
+#ifdef SD_TEST_MIN_GPT
+    check(gpt, "the disk has a GPT");
+    check(volume.fs_type == FS_EXFAT, "the volume is exFAT");
+#else
+    check(!gpt && disk[0x1C2] != 0, "the disk has an MBR partition");
+    check(volume.fs_type == FS_FAT32, "the volume is FAT32");
+#endif
+}
+
 static void t_unmounted()
 {
     SD.end();
@@ -197,7 +218,8 @@ int main(int argc, char **argv)
         printf("FAIL  the RAM disk did not format and mount\n");
         return 1;
     }
-    if      (strcmp(s, "write_read") == 0)    { t_write_read(); }
+    if      (strcmp(s, "layout") == 0)        { t_layout(); }
+    else if (strcmp(s, "write_read") == 0)    { t_write_read(); }
     else if (strcmp(s, "append") == 0)        { t_append(); }
     else if (strcmp(s, "seek_peek") == 0)     { t_seek_peek(); }
     else if (strcmp(s, "remove_exists") == 0) { t_remove_exists(); }

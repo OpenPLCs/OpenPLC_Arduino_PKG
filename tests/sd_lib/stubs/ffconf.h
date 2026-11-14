@@ -3,3 +3,10 @@
 #include "ffconf_default_80286.h"
 #undef FF_USE_MKFS
 #define FF_USE_MKFS 1
+
+/* The GPT build lowers the size from which f_mkfs writes a GPT instead of an
+ * MBR, so a small RAM disk gets one; reading a GPT does not depend on it. */
+#ifdef SD_TEST_MIN_GPT
+#undef FF_MIN_GPT
+#define FF_MIN_GPT SD_TEST_MIN_GPT
+#endif

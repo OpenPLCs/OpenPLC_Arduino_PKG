@@ -75,15 +75,21 @@ endforeach()
 enable_language(CXX)
 set(SDLIB "${CORE_ROOT}/libraries/OpenPLC_SD/src")
 set(FATFS "${CORE_ROOT}/libraries/FatFs/src")
-add_executable(sd_lib_test
-  ${SDLIB}/OpenPLC_SD.cpp
-  ${FATFS}/ff.c ${FATFS}/ffunicode.c ${FATFS}/ffsystem.c ${FATFS}/diskio.c ${FATFS}/ff_gen_drv.c
-  sd_lib/test_main.cpp)
-# stubs first: its Arduino.h and ffconf.h stand in for the STM32 ones.
-target_include_directories(sd_lib_test PRIVATE sd_lib/stubs ${SDLIB} ${FATFS})
-target_compile_definitions(sd_lib_test PRIVATE OPENPLC_SD_HOST_TEST)
-foreach(c write_read append seek_peek remove_exists dirs root unmounted)
-  add_test(NAME T3-12.${c} COMMAND sd_lib_test ${c})
+# Two disks, R3-14's two layouts: MBR + FAT32 and GPT + exFAT.
+foreach(layout fat32 exfat-gpt)
+  add_executable(sd_lib_test_${layout}
+    ${SDLIB}/OpenPLC_SD.cpp
+    ${FATFS}/ff.c ${FATFS}/ffunicode.c ${FATFS}/ffsystem.c ${FATFS}/diskio.c ${FATFS}/ff_gen_drv.c
+    sd_lib/test_main.cpp)
+  # stubs first: its Arduino.h and ffconf.h stand in for the STM32 ones.
+  target_include_directories(sd_lib_test_${layout} PRIVATE sd_lib/stubs ${SDLIB} ${FATFS})
+  target_compile_definitions(sd_lib_test_${layout} PRIVATE OPENPLC_SD_HOST_TEST)
+  if(layout STREQUAL "exfat-gpt")
+    target_compile_definitions(sd_lib_test_${layout} PRIVATE SD_TEST_MIN_GPT=0x2000)
+  endif()
+  foreach(c layout write_read append seek_peek remove_exists dirs root unmounted)
+    add_test(NAME T3-12.${layout}.${c} COMMAND sd_lib_test_${layout} ${c})
+  endforeach()
 endforeach()
 
 # --- T3-22: after a KNX role change or a torn write nothing is restored -------
